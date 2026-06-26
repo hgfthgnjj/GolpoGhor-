@@ -1,0 +1,25 @@
+{
+  "name": "গল্পঘর",
+  "short_name": "গল্পঘর",
+  "description": "বাংলা গল্প পড়ার অ্যাপ",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#241A12",
+  "theme_color": "#5A3D26",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

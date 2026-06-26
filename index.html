@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>গল্পঘর</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5A3D26">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Baloo+Da+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.maateen.me/adorsho-lipi/font.css" rel="stylesheet">
+<style>
+  :root{
+    --ink:#5A3D26; --ink-light:#7A5A3D; --paper:#FBF1E2; --paper-shadow:#EFE0C5;
+    --gold:#C68A45; --gold-deep:#9C6A2E; --maroon:#7A2E2E; --forest:#3F5B45;
+    --plum:#54395E; --text:#2B2014; --slate:#6B5C4A; --danger:#9B3030;
+    --surface:#FBF1E2; --surface-shadow:#EFE0C5; --heading:#5A3D26;
+    --reading-font:'Hind Siliguri', sans-serif;
+  }
+  html.dark{
+    --ink:#1A1208; --ink-light:#2E2117; --paper:#241A12; --paper-shadow:#352519;
+    --surface:#241A12; --surface-shadow:#352519; --text:#EDE3D3; --slate:#B8A78E; --heading:#F0E2C8;
+    --gold:#C68A45; --gold-deep:#9C6A2E;
+  }
+  html.dark .field-input, html.dark .field-textarea{ background:#2E2117; color:#EDE3D3; border-color:#4A3526; }
+  html.dark .field-input::placeholder, html.dark .field-textarea::placeholder{ color:#9C8870; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--ink);font-family:'Hind Siliguri',sans-serif;color:var(--text);min-height:100vh;display:flex;justify-content:center;}
+  .stage{width:100%;max-width:430px;min-height:100vh;background:var(--ink);position:relative;overflow-x:hidden;overflow-y:visible;box-shadow:0 0 60px rgba(0,0,0,.4);}
+  .view{position:absolute;top:0;left:0;width:100%;min-height:100vh;transition:transform .5s cubic-bezier(.16,1,.3,1), opacity .45s ease;}
+  @media (prefers-reduced-motion: reduce){.view{transition:none;}}
+  .view.offscreen-right{transform:translateX(100%);}
+  .view.offscreen-left{transform:translateX(-16%);opacity:0;}
+  .view.active{transform:translateX(0);opacity:1;}
+  .hidden-view{display:none;}
+
+  #home{background:var(--ink);padding-bottom:48px;}
+  .shelf-header{padding:28px 22px 16px;color:var(--paper);}
+  .shelf-eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:600;margin:0 0 4px;}
+  .shelf-sub{margin:4px 0 0;font-size:13px;color:#D9C4A8;}
+  .shelf-greeting{display:flex;align-items:center;gap:12px;padding:0 22px 2px;margin-top:4px;}
+  .shelf-greeting-line{flex:1;height:1px;background:rgba(255,255,255,.12);}
+  .shelf-greeting-text{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35);white-space:nowrap;font-weight:600;}
+
+  .shelf-header-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .shelf-header-text{flex:1;}
+  .shelf-header-actions{display:flex;flex-direction:row;align-items:center;gap:8px;flex-shrink:0;}
+  .header-icon-btn{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);color:var(--gold);width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s,transform .15s;font-size:17px;line-height:1;}
+  .header-icon-btn:active{transform:scale(.88);background:rgba(255,255,255,.2);}
+  .header-icon-btn.has-badge{position:relative;}
+  .header-icon-btn.has-badge::after{content:attr(data-count);position:absolute;top:-4px;right:-4px;background:var(--gold);color:#1B2A4A;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;font-family:'Hind Siliguri',sans-serif;}
+
+  .continue-card{margin:4px 26px 14px;background:linear-gradient(135deg,var(--gold) 0%,var(--gold-deep) 100%);border-radius:12px;padding:16px 18px;cursor:pointer;}
+  .continue-card:active{transform:scale(.985);}
+  .continue-label{font-size:12px;color:#3A2410;font-weight:700;opacity:.85;display:block;margin-bottom:4px;}
+  .continue-title{font-family:'Tiro Bangla',serif;font-size:18px;color:#241405;margin:0 0 2px;}
+  .continue-cat{font-size:12px;color:#4A3018;}
+
+  .shelf-actions{padding:0 26px 6px;}
+  .fav-launch-btn{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#F0D9BE;border-radius:10px;padding:13px;font-size:15px;font-weight:600;cursor:pointer;font-family:'Hind Siliguri',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .fav-launch-btn:active{transform:scale(.985);}
+
+  .shelf{padding:10px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .spine{--c:var(--maroon);background:#fff;border-radius:16px;padding:18px 14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;border:1.5px solid #eee;position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07);transition:transform .15s,box-shadow .15s;text-align:center;}
+  .spine:active{transform:scale(.96);box-shadow:0 1px 6px rgba(0,0,0,.1);}
+  .spine-icon-wrap{width:64px;height:64px;border-radius:16px;background:rgba(198,138,69,.18);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:12px;flex-shrink:0;}
+  .spine-name{font-family:'Tiro Bangla',serif;font-size:16px;color:#2B2014;margin:0 0 6px;line-height:1.3;}
+  .spine-count{font-size:12px;color:#8a7a64;margin-top:2px;display:block;}
+  .spine-add{background:#fff;border:2px dashed #E0C9A6;box-shadow:none;align-items:center;justify-content:center;min-height:140px;}
+  .spine-add .spine-name{color:#7A5A3D;font-size:15px;font-family:'Hind Siliguri',sans-serif;}
+  .spine-add::before{display:none;}
+  .spine-add .spine-icon-wrap{background:rgba(122,90,61,.12);font-size:28px;}
+
+  #category{background:var(--surface);min-height:100vh;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:18px 16px;background:var(--ink);color:var(--paper);position:sticky;top:0;z-index:5;transition:opacity .35s ease, transform .35s ease;}
+  .topbar.header-hidden{opacity:0;transform:translateY(-10px);pointer-events:none;}
+  .back-btn{background:rgba(255,255,255,.22);border:none;color:#FFF8EE;width:38px;height:38px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .18s,transform .15s;}
+  .back-btn:active{background:rgba(255,255,255,.38);transform:scale(.88);}
+  .topbar-title{font-family:'Tiro Bangla',serif;font-size:18px;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#FFF8EE;}
+  .icon-btn{background:rgba(255,255,255,.20);border:none;color:#FFF8EE;width:34px;height:34px;border-radius:8px;font-size:15px;cursor:pointer;flex-shrink:0;}
+  .icon-btn.danger{color:#FFB8A8;}
+  .toc-wrap{padding:14px 22px 80px;}
+  .toc-item{display:flex;align-items:baseline;gap:14px;padding:18px 0;border-bottom:1px solid var(--surface-shadow);cursor:pointer;}
+  .toc-item:active{opacity:.6;}
+  .toc-num{font-family:'Tiro Bangla',serif;font-size:15px;color:var(--gold-deep);flex-shrink:0;width:26px;}
+  .toc-text{flex:1;}
+  .toc-title{font-family:'Tiro Bangla',serif;font-size:18px;margin:0 0 4px;color:var(--text);}
+  .toc-meta{font-size:13px;color:var(--slate);margin:0;}
+  .toc-add{display:flex;align-items:center;gap:14px;padding:18px 0;margin-top:6px;cursor:pointer;color:var(--gold-deep);font-weight:600;}
+  .toc-add:active{opacity:.6;}
+  .empty-state{margin-top:50px;text-align:center;color:var(--slate);padding:0 30px;}
+  .empty-state .em-icon{font-size:30px;margin-bottom:10px;display:block;}
+  .empty-state p{font-size:14px;line-height:1.7;margin:6px 0;}
+
+  #story{background:var(--surface);min-height:100vh;}
+  .story-ribbon{height:7px;background:linear-gradient(90deg,var(--gold),var(--gold-deep));}
+  .story-head{padding:26px 24px 16px;border-bottom:1px solid var(--surface-shadow);}
+  .story-cat-tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-deep);font-weight:600;}
+  .story-title{font-family:'Tiro Bangla',serif;font-size:25px;line-height:1.35;margin:10px 0 8px;color:var(--heading);}
+  .story-meta{font-size:13px;color:var(--slate);}
+  .story-body{padding:22px 24px 80px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);transition:font-size .15s ease;}
+  .font-option{padding:14px 16px;border:1.5px solid var(--surface-shadow);border-radius:10px;margin-bottom:10px;cursor:pointer;font-size:16px;color:var(--text);display:flex;flex-direction:column;gap:4px;}
+  .font-option.selected{border-color:var(--gold);background:rgba(217,164,65,.08);}
+  .font-option .font-sample{color:var(--slate);font-size:14px;}
+
+  /* ── Numbered Paragraph Sections ── */
+  .para-section{margin:0 0 28px;}
+  .para-section-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;margin-top:28px;}
+  .para-section-header:first-child{margin-top:0;}
+  .para-section-num{font-family:'Tiro Bangla',serif;font-size:12px;font-weight:700;color:var(--gold-deep);background:rgba(198,138,69,.12);border:1.5px solid rgba(198,138,69,.35);border-radius:20px;padding:3px 11px;white-space:nowrap;letter-spacing:.04em;flex-shrink:0;}
+  .para-section-line{flex:1;height:1px;background:linear-gradient(90deg,rgba(198,138,69,.3),transparent);}
+  .para-section-bookmark{background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:8px;font-size:16px;color:var(--slate);transition:color .15s,transform .15s;flex-shrink:0;}
+  .para-section-bookmark:active{transform:scale(.85);}
+  .para-section-bookmark.bookmarked{color:var(--gold);}
+  .para-section-content p{margin:0 0 14px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);transition:font-size .15s ease;}
+  .para-section-content p:last-child{margin-bottom:0;}
+  .para-section-content p:first-of-type::first-letter{font-family:'Tiro Bangla',serif;font-size:50px;float:left;line-height:.8;padding:6px 8px 0 0;color:var(--gold-deep);}
+  .para-section:not(:first-child) .para-section-content p:first-of-type::first-letter{font-size:inherit;float:none;line-height:inherit;padding:0;color:inherit;}
+  .para-bookmark-toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:30px;font-size:13px;opacity:0;transition:all .3s ease;z-index:70;pointer-events:none;white-space:nowrap;}
+  .para-bookmark-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .bookmark-indicator{position:fixed;right:14px;bottom:80px;background:var(--gold);color:#241405;border:none;border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 3px 14px rgba(0,0,0,.25);z-index:60;transition:transform .15s;}
+  .bookmark-indicator.visible{display:flex;}
+  .bookmark-indicator:active{transform:scale(.88);}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(13,18,33,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50;opacity:0;pointer-events:none;transition:opacity .25s ease;}
+  .modal-overlay.open{opacity:1;pointer-events:auto;}
+  .modal-card{width:100%;max-width:430px;background:var(--surface);border-radius:18px 18px 0 0;padding:24px 22px 28px;max-height:88vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.22,.61,.36,1);}
+  .modal-overlay.open .modal-card{transform:translateY(0);}
+  .modal-title{font-family:'Tiro Bangla',serif;font-size:20px;margin:0 0 16px;color:var(--heading);}
+  .field-label{font-size:13px;color:var(--slate);margin:0 0 6px;display:block;font-weight:600;}
+  .field-input,.field-textarea{width:100%;border:1.5px solid var(--surface-shadow);background:#fff;border-radius:10px;padding:12px 14px;font-family:'Hind Siliguri',sans-serif;font-size:15px;color:var(--text);margin-bottom:16px;}
+  .field-textarea{min-height:160px;line-height:1.8;resize:vertical;}
+  .field-input:focus,.field-textarea:focus{outline:2px solid var(--gold);border-color:var(--gold);}
+  .color-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;}
+  .color-dot{width:38px;height:38px;border-radius:50%;cursor:pointer;border:3px solid transparent;}
+  .color-dot.selected{border-color:var(--heading);}
+  .btn-row{display:flex;gap:10px;margin-top:6px;}
+  .btn{flex:1;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;cursor:pointer;font-family:'Hind Siliguri',sans-serif;}
+  .btn-primary{background:var(--ink);color:var(--paper);}
+  .btn-primary:active{background:var(--ink-light);}
+  .btn-ghost{background:var(--surface-shadow);color:var(--text);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:30px;font-size:13px;opacity:0;transition:all .3s ease;z-index:60;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ── PIN Screen ── */
+  .pin-screen{position:fixed;inset:0;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;padding:32px 24px;}
+  .pin-logo{width:56px;height:56px;border-radius:16px;object-fit:contain;margin-bottom:16px;}
+  .pin-title{font-family:'Tiro Bangla',serif;font-size:22px;color:var(--paper);margin:0 0 6px;text-align:center;}
+  .pin-sub{font-size:13px;color:rgba(255,255,255,.45);margin:0 0 36px;text-align:center;font-family:'Hind Siliguri',sans-serif;}
+  .pin-dots{display:flex;gap:18px;margin-bottom:40px;}
+  .pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:transparent;transition:background .15s,border-color .15s;}
+  .pin-dot.filled{background:var(--gold);border-color:var(--gold);}
+  .pin-dot.error{background:#e05555;border-color:#e05555;}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:280px;}
+  .pin-key{background:rgba(255,255,255,.08);border:none;color:var(--paper);border-radius:50%;width:72px;height:72px;font-size:22px;font-family:'Tiro Bangla',serif;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s;margin:auto;}
+  .pin-key:active{background:rgba(255,255,255,.22);transform:scale(.91);}
+  .pin-key.del{font-size:18px;background:rgba(255,255,255,.04);}
+  .pin-key.empty{background:transparent;pointer-events:none;}
+  .pin-setup-msg{font-size:13px;color:var(--gold);margin-bottom:24px;text-align:center;font-family:'Hind Siliguri',sans-serif;min-height:20px;}
+  .pin-change-btn{margin-top:28px;background:transparent;border:none;color:rgba(255,255,255,.3);font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;padding:8px 16px;}
+  .pin-change-btn:active{color:rgba(255,255,255,.6);}
+  .loading-screen{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;color:var(--gold);font-family:'Tiro Bangla',serif;font-size:16px;z-index:100;}
+  .dark-toggle-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.35);color:var(--gold);width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s,transform .15s;font-size:17px;line-height:1;flex-shrink:0;}
+  .dark-toggle-btn:active{transform:scale(.88);background:rgba(255,255,255,.2);}
+  /* ── hamburger btn ── */
+  .menu-btn{background:rgba(255,255,255,.08);border:none;color:var(--paper);width:34px;height:34px;border-radius:8px;font-size:15px;cursor:pointer;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0;}
+  .menu-btn span{display:block;width:16px;height:2px;background:currentColor;border-radius:2px;}
+  /* ── reader bg themes ── */
+  .reader-bg-dark   { --reader-bg:#1d2733; --reader-text:#ffffff; --reader-topbar:#161e29; }
+  .reader-bg-sepia  { --reader-bg:#f5efe6; --reader-text:#2e1f0e; --reader-topbar:#ede4d7; }
+  .reader-bg-green  { --reader-bg:#1e2d25; --reader-text:#ffffff; --reader-topbar:#172019; }
+  .reader-bg-warm   { --reader-bg:#fdf6e3; --reader-text:#2e2210; --reader-topbar:#f0e8d0; }
+  .reader-bg-grey   { --reader-bg:#2b2b2b; --reader-text:#ffffff; --reader-topbar:#222222; }
+  /* apply theme to story view */
+  .reader-themed #story            { background: var(--reader-bg) !important; }
+  .reader-themed #storyTopbar      { background: var(--reader-topbar) !important; }
+  .reader-themed .story-body       { color: var(--reader-text) !important; }
+  .reader-themed .story-title      { color: var(--reader-text) !important; }
+  .reader-themed .story-cat-tag    { color: var(--reader-text) !important; opacity:.7; }
+  .reader-themed .story-meta       { color: var(--reader-text) !important; opacity:.6; }
+  .reader-themed .topbar-title     { color: var(--reader-text) !important; }
+  .reader-themed .back-btn         { color: var(--reader-text) !important; }
+  .reader-themed .icon-btn         { color: var(--reader-text) !important; }
+  .reader-themed .menu-btn         { color: var(--reader-text) !important; }
+  .reader-themed .para-section-content p  { color: var(--reader-text) !important; }
+  .reader-themed .para-section-num        { color: var(--reader-text) !important; opacity:.7; background:rgba(255,255,255,.08) !important; border-color:rgba(255,255,255,.18) !important; }
+  .reader-themed .para-section-line       { background: linear-gradient(90deg,rgba(255,255,255,.2),transparent) !important; }
+  .reader-themed .para-section-bookmark   { color: var(--reader-text) !important; opacity:.55; }
+  .reader-themed .para-section-bookmark.bookmarked { color: var(--gold) !important; opacity:1; }
+  .reader-themed .story-head              { border-bottom-color: rgba(255,255,255,.1) !important; }
+  /* ── drawer overlay ── */
+  .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s;}
+  .drawer-overlay.open{opacity:1;pointer-events:all;}
+  /* ── drawer panel ── */
+  .reader-drawer{position:fixed;top:0;right:-280px;width:260px;height:100%;background:var(--reader-bg,var(--ink));z-index:50;transition:right .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;padding:28px 20px 32px;gap:0;box-shadow:-4px 0 24px rgba(0,0,0,.35);}
+  .reader-drawer.open{right:0;}
+  .drawer-close{align-self:flex-end;background:rgba(255,255,255,.1);border:none;color:var(--reader-text,var(--paper));width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-bottom:18px;}
+  .drawer-section{margin-bottom:24px;}
+  .drawer-label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--reader-text,var(--paper));opacity:.5;font-weight:700;margin-bottom:12px;display:block;font-family:'Hind Siliguri',sans-serif;}
+  .drawer-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .drawer-btn{background:rgba(255,255,255,.1);border:none;color:var(--reader-text,var(--paper));border-radius:10px;padding:10px 14px;font-size:14px;cursor:pointer;font-family:'Hind Siliguri',sans-serif;display:flex;align-items:center;gap:8px;width:100%;}
+  .drawer-btn:active{background:rgba(255,255,255,.2);}
+  .drawer-btn.active-item{background:rgba(255,255,255,.22);font-weight:700;}
+  /* bg color swatches */
+  .bg-swatches{display:flex;gap:10px;flex-wrap:wrap;}
+  .bg-swatch{width:38px;height:38px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:border-color .15s,transform .15s;}
+  .bg-swatch:active{transform:scale(.9);}
+  .bg-swatch.selected{border-color:#fff;}
+  .emoji-sel{border-color:var(--gold) !important;background:rgba(217,164,65,.18) !important;}
+
+  /* font size slider */
+  .font-size-row{display:flex;align-items:center;gap:10px;margin-top:4px;}
+  .font-size-label{font-size:13px;color:var(--reader-text,var(--paper));opacity:.7;white-space:nowrap;font-family:'Hind Siliguri',sans-serif;min-width:28px;text-align:center;}
+  .font-size-slider{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.2);outline:none;cursor:pointer;display:block;margin:0;padding:0;vertical-align:middle;}
+  .font-size-slider::-webkit-slider-container{display:flex;align-items:center;}
+  .font-size-slider::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:rgba(255,255,255,.2);}
+  .font-size-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:var(--gold,#C68A45);cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,.4);margin-top:-11px;border:none;}
+  .font-size-slider::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.12);}
+  .font-size-slider::-moz-range-track{height:6px;border-radius:3px;background:rgba(255,255,255,.2);}
+  .font-size-slider::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--gold,#C68A45);cursor:grab;border:none;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+  html.dark .spine{background:#243040;border-color:#2e3d4f;}
+  html.dark .spine-name{color:#F2F0EA;}
+  html.dark .spine-count{color:#9AA7B5;}
+  html.dark .spine-add{border-color:#3a5040;background:#1d2a24;}
+  html.dark .spine-add .spine-name{color:#7ecf9e;}
+  html.dark .topbar{background:var(--ink);}
+  html.dark .back-btn{color:var(--paper);}
+  html.dark .topbar-title{color:var(--paper);}
+  html.dark .icon-btn{color:var(--paper);}
+  html.dark .icon-btn.danger{color:#F0B8A8;}
+  html.dark .toc-item .toc-title{color:var(--text);}
+  html.dark .toc-add{color:var(--gold-deep);}
+  html.dark .empty-state{color:var(--slate);}
+</style>
+</head>
+<body>
+
+<!-- Book Animation Loading Screen -->
+<div class="loading-screen" id="loadingScreen" style="flex-direction:column;gap:0;background:var(--ink);overflow:hidden;">
+
+  <div class="book-particles" id="bookParticles"></div>
+
+  <div class="book-scene" id="bookScene">
+    <div class="book-glow"></div>
+    <div class="book-3d" id="book3d">
+      <div class="book-back"></div>
+      <div class="book-pages">
+        <div class="book-page-stack p1"></div>
+        <div class="book-page-stack p2"></div>
+        <div class="book-page-stack p3"></div>
+      </div>
+      <div class="book-spine-3d"></div>
+      <div class="book-front" id="bookFront">
+        <div class="book-front-inner">
+          <div class="book-cover-ornament top"></div>
+          <div class="book-cover-icon">📖</div>
+          <div class="book-cover-title">গল্পঘর</div>
+          <div class="book-cover-ornament bottom"></div>
+        </div>
+      </div>
+      <div class="book-opening-page left-page" id="leftPage">
+        <div class="page-lines">
+          <div class="page-line"></div><div class="page-line short"></div>
+          <div class="page-line"></div><div class="page-line med"></div>
+          <div class="page-line"></div><div class="page-line short"></div>
+          <div class="page-line"></div>
+        </div>
+      </div>
+      <div class="book-opening-page right-page" id="rightPage">
+        <div class="page-lines">
+          <div class="page-line short"></div><div class="page-line"></div>
+          <div class="page-line med"></div><div class="page-line"></div>
+          <div class="page-line short"></div><div class="page-line"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="book-load-text" id="bookLoadText">
+    <span class="book-app-name">গল্পঘর</span>
+    <span class="book-tagline">গল্পের জগতে স্বাগতম</span>
+    <div class="book-dots">
+      <span class="book-dot-anim"></span>
+      <span class="book-dot-anim"></span>
+      <span class="book-dot-anim"></span>
+    </div>
+  </div>
+</div>
+
+<style>
+.book-particles{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+@keyframes particleFloat{
+  0%{transform:translateY(0) scale(0);opacity:0;}
+  20%{opacity:.7;}
+  100%{transform:translateY(-120px) translateX(var(--px,0px)) scale(1.5);opacity:0;}
+}
+.book-scene{position:relative;display:flex;align-items:center;justify-content:center;width:200px;height:220px;margin-top:-20px;}
+.book-glow{position:absolute;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(198,138,69,.35) 0%,transparent 70%);animation:glowPulse 2s ease-in-out infinite;}
+@keyframes glowPulse{0%,100%{transform:scale(1);opacity:.6;}50%{transform:scale(1.15);opacity:1;}}
+.book-3d{position:relative;width:130px;height:170px;transform-style:preserve-3d;animation:bookEntrance .55s cubic-bezier(.34,1.56,.64,1) forwards;}
+@keyframes bookEntrance{
+  0%{transform:rotateY(-30deg) rotateX(15deg) scale(.6);opacity:0;}
+  60%{transform:rotateY(-18deg) rotateX(8deg) scale(1.04);}
+  100%{transform:rotateY(-22deg) rotateX(10deg) scale(1);opacity:1;}
+}
+.book-back{position:absolute;inset:0;background:linear-gradient(135deg,#6B2A2A 0%,#8B3A3A 50%,#7A2E2E 100%);border-radius:3px 8px 8px 3px;box-shadow:4px 4px 16px rgba(0,0,0,.5);}
+.book-spine-3d{position:absolute;top:0;left:-14px;width:14px;height:100%;background:linear-gradient(90deg,#4A1A1A,#7A2E2E,#5A2222);border-radius:3px 0 0 3px;transform:rotateY(-90deg);transform-origin:right center;}
+.book-pages{position:absolute;top:2px;right:-5px;width:8px;height:calc(100% - 4px);}
+.book-page-stack{position:absolute;right:0;width:8px;height:100%;background:linear-gradient(90deg,#f5ede0,#fdf6ee,#f5ede0);border-radius:0 2px 2px 0;}
+.book-page-stack.p1{right:-1px;background:#ede0cc;}
+.book-page-stack.p2{right:-3px;background:#e8d8c0;}
+.book-page-stack.p3{right:-5px;background:#e0cdb0;}
+.book-front{position:absolute;inset:0;background:linear-gradient(160deg,#8B3535 0%,#C04040 30%,#8B2E2E 70%,#6B2222 100%);border-radius:3px 8px 8px 3px;box-shadow:3px 6px 24px rgba(0,0,0,.45), inset 0 0 0 1.5px rgba(255,255,255,.08);overflow:hidden;transform-origin:left center;animation:coverOpen .5s ease-in-out .55s forwards;}
+@keyframes coverOpen{0%{transform:rotateY(0deg);}100%{transform:rotateY(-145deg);}}
+.book-front-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:12px;background:linear-gradient(180deg,rgba(255,255,255,.05) 0%,transparent 100%);}
+.book-cover-ornament{width:60px;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.book-cover-icon{font-size:28px;margin:2px 0;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
+.book-cover-title{font-family:'Tiro Bangla',serif;font-size:15px;color:#FFE4B0;letter-spacing:.04em;text-align:center;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+.book-opening-page{position:absolute;inset:0;background:linear-gradient(135deg,#FBF1E2,#FDF6EE);border-radius:2px;padding:18px 14px;opacity:0;transform-origin:left center;}
+.left-page{border-right:1px solid #e0d0ba;animation:leftPageReveal .3s ease-out 1s forwards;}
+.right-page{border-left:1px solid #e0d0ba;animation:rightPageReveal .3s ease-out 1.1s forwards;}
+@keyframes leftPageReveal{0%{opacity:0;transform:rotateY(20deg);}100%{opacity:1;transform:rotateY(0deg);}}
+@keyframes rightPageReveal{0%{opacity:0;}100%{opacity:1;}}
+.page-lines{display:flex;flex-direction:column;gap:8px;padding-top:4px;}
+.page-line{height:2px;background:linear-gradient(90deg,#C68A45,rgba(198,138,69,.2));border-radius:2px;width:100%;}
+.page-line.short{width:55%;}
+.page-line.med{width:78%;}
+.book-load-text{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:28px;animation:textFadeIn .4s ease-out .15s both;}
+@keyframes textFadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.book-app-name{font-family:'Tiro Bangla',serif;font-size:26px;color:var(--gold);letter-spacing:.04em;text-shadow:0 0 20px rgba(198,138,69,.4);}
+.book-tagline{font-size:13px;color:rgba(255,255,255,.45);font-family:'Hind Siliguri',sans-serif;letter-spacing:.03em;}
+.book-dots{display:flex;gap:8px;margin-top:4px;}
+.book-dot-anim{width:6px;height:6px;border-radius:50%;background:var(--gold);opacity:.25;animation:dotBounce 1.2s ease-in-out infinite;}
+.book-dot-anim:nth-child(2){animation-delay:.2s;}
+.book-dot-anim:nth-child(3){animation-delay:.4s;}
+@keyframes dotBounce{0%,100%{opacity:.25;transform:translateY(0);}50%{opacity:1;transform:translateY(-5px);}}
+</style>
+
+<script>
+(function spawnParticles(){
+  const container = document.getElementById('bookParticles');
+  if(!container) return;
+  const chars = ['✦','✧','·','◦','❋','⁕'];
+  for(let i=0;i<18;i++){
+    const p = document.createElement('span');
+    const isChar = Math.random() > .5;
+    p.style.cssText = `position:absolute;left:${10+Math.random()*80}%;bottom:${10+Math.random()*40}%;font-size:${isChar?(8+Math.random()*8)+'px':'4px'};color:var(--gold);opacity:0;animation:particleFloat ${2+Math.random()*2}s ease-in-out ${Math.random()*1.5}s infinite;--px:${(Math.random()-.5)*60}px;`;
+    p.textContent = isChar ? chars[Math.floor(Math.random()*chars.length)] : '';
+    if(!isChar){p.style.borderRadius='50%';p.style.background='var(--gold)';p.style.width='4px';p.style.height='4px';p.style.display='block';}
+    container.appendChild(p);
+  }
+})();
+</script>
+
+<!-- PIN Screen -->
+<div class="pin-screen" id="pinScreen" style="display:none;">
+  <img src="data:image/png;base64,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" alt="লোগো" class="pin-logo">
+  <h2 class="pin-title" id="pinTitle">পাসওয়ার্ড দিন</h2>
+  <p class="pin-sub" id="pinSub">গল্পঘরে প্রবেশ করতে PIN দিন</p>
+  <div class="pin-setup-msg" id="pinSetupMsg"></div>
+  <div class="pin-dots" id="pinDots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinPress('1')">১</button>
+    <button class="pin-key" onclick="pinPress('2')">২</button>
+    <button class="pin-key" onclick="pinPress('3')">৩</button>
+    <button class="pin-key" onclick="pinPress('4')">৪</button>
+    <button class="pin-key" onclick="pinPress('5')">৫</button>
+    <button class="pin-key" onclick="pinPress('6')">৬</button>
+    <button class="pin-key" onclick="pinPress('7')">৭</button>
+    <button class="pin-key" onclick="pinPress('8')">৮</button>
+    <button class="pin-key" onclick="pinPress('9')">৯</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="pinPress('0')">০</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <button class="pin-change-btn" id="pinChangeBtn" onclick="pinForgot()" style="display:none;">PIN ভুলে গেছেন?</button>
+</div>
+
+<!-- Home Settings Drawer -->
+<div class="drawer-overlay" id="homeDrawerOverlay" onclick="closeHomeMenu()"></div>
+<div class="reader-drawer" id="homeDrawer" style="background:var(--ink);">
+  <button class="drawer-close" onclick="closeHomeMenu()">✕</button>
+  <div class="drawer-section">
+    <span class="drawer-label">সেটিংস</span>
+  </div>
+  <div class="drawer-section">
+    <span class="drawer-label">পাসওয়ার্ড</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <span style="font-size:14px;color:rgba(255,255,255,.7);font-family:'Hind Siliguri',sans-serif;">PIN লক চালু</span>
+      <label style="position:relative;display:inline-block;width:46px;height:26px;">
+        <input type="checkbox" id="pinToggle" onchange="handlePinToggle(this.checked)" style="opacity:0;width:0;height:0;">
+        <span id="pinToggleSlider" style="position:absolute;cursor:pointer;inset:0;background:rgba(255,255,255,.15);border-radius:26px;transition:.3s;">
+          <span id="pinToggleThumb" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;"></span>
+        </span>
+      </label>
+    </div>
+    <div id="pinSettingsInfo" style="font-size:12px;color:rgba(255,255,255,.35);font-family:'Hind Siliguri',sans-serif;line-height:1.6;"></div>
+    <button id="changePinBtn" onclick="startChangePin()" style="display:none;margin-top:10px;width:100%;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);border-radius:10px;padding:11px;font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;">🔑 PIN পরিবর্তন করুন</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div id="home" class="view active">
+    <div class="shelf-header">
+      <div class="shelf-header-top">
+        <div class="shelf-header-text" style="display:flex;align-items:center;gap:10px;">
+          <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAm/0lEQVR42uV9ebwkRZXudyIis6rufnuhgcYGZBEXHB6OOOKMC6jzVHTcd1yeDIwCCm7AA1lERFAHkEXBQZ+g6LTbKKijzig+eQ6KooCjLE03NE03vd217r1VlRlx3h+ZlRkRGVm35ffeP+P119JLVS4RJ875zne+OEF4nD/MTAAEAAKgiYjxZ/bDzCr/7eN+f3ocNxUAiIi09/djnU5ntRBilCiNkgQyiiIAKQGKkyRBFGWfTZLsv9mfs79M05SUYk5TIqVCd1b5Cyb554kAoPys4uwa7rfSFFCKObtPSkgBKMD+b4r+Z7LrVu6fAgkzK6W6cWzmZ2e7UxMTE1Pe+0sATETm/8sE9C2+P/BTU1Pjo6OjzwPwYiHoL9nwEwGskErJ/8pWn6apIaIZAh42zHcS0Y8XFxd/MjY2tvPxTATt4eDL/sB3Op2nRFKeBEGvEUKu9T4HYwzAzAyAQAAY7N+QCODsX/qfKa6Rf4aJQMUfAKb8t5x/Pf9v/0tcXja7R/4EoOy5KH9V/56c/57yz7ovjuI72WMThBBE5H7QaL0TRP+SpunnGo3Gnf6YPe4JsK2+3W7v02g0ziWid0opG4U1gAwIxMwiH1wiayC9d8nvSiBmZ8D9z1DNn8l5bK5+jwjM5YChmAxvguuum09Y3eBkdsOZTRAZMEgqKQHAGK2N4S+naXpBq9XalLtrHhQfaJnBBxFxt9t9i1LyU0LIvY0xYGNSBqQgov5D2y9ZuXTwTbwJ6Jt15RqlJTvfzZaJuyzqTQn5yJbLxJ46+7uORVSNJPScnC0rDUBJKaG1njbGnBnH8XX9uFnnkqgu0BKRYWaZpukVSqmTAUCnaQoiSX3v0v86lwvVtiR3wMi/h/UAvr1712BeZg0HfFH9rZ2/ZOZspbC3JoiKeXbtwTIIrqxtMJBKKVXmIZIbt2177KR169Yt1U0C1Q3+tm3bhlevXPl1GUUv0UanrI0UUlLxoIUlseduaqySQ9ZmWSRVB6/WmO2XtgfP/739efvP5BqC79Or13NXubNqHQPJPmeMYSLSUkqltb5NSvkKIpoOTQIF3A4BUEmSfD+KomN1qhMiRNXIV2Ph/hIOWdqeDHIokCAQUIODHpj8/krhvnWzG0/I9if5EqfSddmgonhEKsJ38B2ZOZFSRlrrX0opXwSg3Xfr/UcT9uDfeuutkohMkiQ3RlF0rNY6IUFR8TKOVYXdA/vWac+0M6DsDjizNZCB6zLn70XZPagMsmw/S+B72XNYE1UMvg112HGL3HdnlYCcXYtyF2Xfj7xJJ6JIa51IKZ+ltV7fH/N+fHWu24dNvU7nzKjRuFhrnRAQVay1sqQ57JgHxkSuD7o04F6FlblDEvTjVF0x/nP7CIzsVeIsmPCz2vA0uFzL50uklFGv17uk0WicaUNUsgd/YWHhmY1G4/Z+AK4AXgwenIq/DE3eAJjHsF/WCszegLsBsyYmEDmDHBoeLrwMubElFD/YW5m1rtg3juz/CaSFFKrT6RzbarV+0h/z/nLg9evXyzhW10gphTGG9mjwkWNutl6eUP+A+bImypewB6ToT8gP2fJrHHB5sHMBskAblSuk8MSZLwkEYn+NBII9u5PPNsTNVysRkWEjMvpFXb1p06ZmZvdMxMyKiNJud/H4OG7doNNUkxB7TieEUAct43YCK4OJrTjhIayKRdrjRXl262N0CuN8hOFj5dkq/gnV/GFQ/mJD1sKdcSqlVEmn89641bqSmRXlK0CmaXq3UuqwNE1ZCCHql3vgwQJQzHErPgoJDgoHgnxg0vyJrAR2qg7yoBjiURY+XVKZucqAU3hleFAdBLCBkUqSTtNHpFKHAegIIuJOp3OMUurJWmsmIuEMQh9BkGV9hQ/l+myHEUAPLmJhB/l4GWoxYdaLcQBB0wAnlbufKliwrtcPoE6whuMeUcEs3rtY92H7z303lo8hCRJaayOVWqd17zgiYpFRuurN+VMYclJ968GtJInBLny0MlvHfxaDRu61KhCsDIqObyV4McVn4HjAKiX32fLvkRWcq/GqNAZnHBwcbduFFUjYgrds3dNb1fk4sTF4ax+TDjPzMbmZiz5DyPkgcoXPLHgIB/eSTw3kN+9j9v4vsv6diwfkHC6yY0VcBD53idvYnvcgsXNiSP55F1pyASDIn8RgnLNgL1fvzcRVIrC0n7yeIv6amVeLZGnpSCnlE4wxeWJGLpgpZjpM1ToIAN6KKQyXrYBU8ijEvquicnD6E82ovCSBYIwBswERwWjtrsA6NEWe+7NdG4dJP/u6fcTHfnbpQXKCO/i2qyUSpLVmpdSKbrf7bAGljhRCgJk1Wf6wtOIyaXFfsnwJHpQRM2zTd0lkcuEre5PnuB7LZxvWUEpB5qUr1S+1MVeRTghiglxahCgAYe0cggr3UiAu2y1TgNtC9b2LyWKYfGU+UxHRk2spYmvtkI9Wcj9Z0AMeqVVYAZGz9FGgIgr4Li4TJDvDtTIprVNEUYyN996Nr1/7SczP7MZzX/Z6vPi178hWgjGWi7HDyTLoy19Bvvvvr1pYBuGwox5Q6CeB9nfg5j5S0pMUMe9XEHHk4wBycXiAUi7dRRUN9f+9IM3sawbyhL7LIauKZZNg/cG/6/ZbcfV5p2J+dgYqjvH5T5yJx7Y8hONPOx8wBsYY65ntVYhwLYCruN6m1hkMYstvspVKB6ktLlx3EdvIXkX94aJ9BRNNhEGWG/9CnA/5y60sGXlo0MqYnQDmZZEorcqt9WSlziiKcdsPv41/POMEdDodDI9NQEUNjK9YhZu//Dl85pz3QCcJlFIwWherz41hHqxgJ9i575YbTWE8jpGTAy7s61MwsSuhdZ+MY2NWilwbEF6eVAbRUE4C9vMfcuCr/eJ2kIUf2AbE9z4aU1GE7910La654H0QUkFFEdI0AcBI0xRjk6vwix99B5d84G2Ym94NFUXZJNRc2SlB+u/jrwp2aQayY6AHhf2IQ1wtXNk4SzBr5biQYPCoFA4siGjZk2O9VKWEc9fCFmqy4Vr/xQqaOXclUip85cqLcMPlF6DRGnFijjEGQggYnWJ0cgXuueM2fOyUN2L7loehogja6IBFZc+hjS7ihmEDw7pEVLbbtd6reLcaYEgh99q3/ACRIaqZJdVbpAcbOZjHVIOcny9QBZ9XWU9jDIRSYKNxzUdPx7986SqMjE8Wr2m0RpokiOIYnaUlCKmQJglGxifxyKb78dGTX4cH/3gXoiiGTtMKEJJKIYoiqP4vlf+KIkgpvWVYUwv1DI0GwPQSPbmUDvV6nV9HUeMZWmtDgAgF0VpijEKKA0sKUletCjxnGaOzwVVRhMX2HK78yCn49W0/xtjkSpg0hRACqU6Rdrv4Hx++GIccfiQ+/eETsGPrZgyNjkEnCaSK0FlaQLM1hFMvuBJHHH0MkqQHKRWYGYIEZqd3YsvG+yGkzN1JGavWHfxkDI9OZHmGTZPb6MZWX9SScmGDNsawUoqSXu9+awJSQyBhp87sQLAB5chKKHAf1oalThmRCv6huFEf6ezevhWXnXUiHvj9bzEyMZkNvpTodbuQUuLk8y7HM5//EgDA7u2P4tNnnIgNf/gtxiZWIE1TSCGRJD0Yo3HiWZfiuS99LdIkAYMRRTG+cOlZuOWmz2NkfBJap1mpSkgszE3jbaedj1e+41QkvV62GoKEXtW42Km01astiglIevdXXRCXyQsRBvP7Ht9BqJJflP/PIUqdhKukFXSaDf7mB+/Fx055Ax78410YnZiETlNIpdBZXMDQyBjOvOwGPPP5L0GaJEh6HaxcsxZnX3kTjjz6mCwAq8z3qyhGFDfw2QtPx803fjZL2HKA0Ot10Wi20Gy20Gi2EDdaaLaGEDda6HaWPFhIFVTnk3ClkdHgIoa3SMQgdoFr5CAcKLL4ZUDXr5TkHPvxJn8BrVNEcYw/3Hk7Ljrljdi5bQuGRsYzP68iLMzNYs1+B+Dcq7+Gw454FnqLszAzG8DTG9CbewzDo+P44Ke+iOcd93rMTu2EUqoI6K3hMXz5ygtx4xUXIIrjjJDJF7s2BmwY4Iza0EaXoZE91xmqhTtkpQ947Ay+yMqcKRJBpEMuJ+PAen+Z2RiOufrvucywj3zKonr5YiZ3O7/66fdx6QfejqXFNhqtYRidQkUxpqd24Ul/8Uyce816rD3wUCQLU8DcJnCyCJgEaG9BMvMIhIxw8nlX4JVvPwXt2ZnSIpkxOrESt3zlWlx17ikwWiOKG3nCZuUADAiisI7ITo8dBphcat56z4qeiFHJQRT2wGexJb5wL1ytv4b+jYpynQXlCqWDgYpi/Nu3bsQXPnUO4kYTKoqhdQopFeamd+HoFx6Hd597GVpDI0jmd4DbW3J+XWX3EAq8uB2pSSDH98dbTj0HYytW4aarPo7W0DAoh6njK1bhZ9//ep7YaQghnQJbxeDILjWyB9VdSyY7obBqA26Vr1Ja8ybA54LYEq4OEkhZ/t4m6mhAmZIz9hVKRfjWF67A+ms/ieHRsULqIYXE7PQuvPg1b8ffn3kxiASSua3g9laAZP8i1kQrYGkqw/Kj6/Dyt/wDVq5ag+suPgPQGiqOkSYJJleuwR0/+wGEiDA0MpqxqqhUOWtkN7bY1zJOv3hVEQOwndU6lwuugArbZ2lyQpLAkNshVGV8/e8bYyCFAAmBL3zqHPxo/RcxMj6Z08uZhqA9N4M3nPhBvO7ED0IbAzO7Gby4sxz8ik6UAanAnRlAJ0jGD8DRf/sqjE6uwtXnnYqF9hyarWGkaYK4MZQnYiYoDA7ViimkgnMG15LA9JXd4KBA2DZisae1d6oLzHZxxA/zVK1NGp1RyUmS4MpzT8EP//l6DBeDT9Bao9tZxAlnXIzXnfhBpGkKPbMJvLA9G3wagAqYAREBySJ4ZgN6S/M4/Ki/wVmfuQmr1qxFe34WUikYoy23SmEOrAZus1+QJHKRtM0UDNROZRcSlZsUpBm82gBcP+j7QqrKd3xKo59gtWdn8OkPvRP/+wffxNiKVWCjQUKg1+tCCoH3fewavOg1b0Pa64CnNwCdaUDGAbawBqMJBegUmN2I3sI09j/kKTj7yq/ioCc/HXMzU5AqqkiaKFD5C2X3Bb9l10GKAS8JUgJV1X6BH1F1QVTAJX8HRKHl8ZeGQ0qhKhfMYaaKIuzctgUXnvJG/O6XP8PEitVIkwRCSiwttDEyOoEPf/pLOOoFL0XSacPMPAhO2tmAgl2sTbR8QZ41MP8weu2dWLXPfjjriq/gyOcci7np3UUxp8oDkycWqMqP+36eyKofO1qCUFkzDHRE0NewS6I5QvKQpMOR67lFbaYywXro/v/EhSe/Hps3/AEjY5NI0x5kjvH33u8A/M8rb8KTjjgKyeIseHYjOF1yBj9QfF1mOYjsGec2oze3LcsVLv0Cjvm7N2FueheIBIQgj1kxiBqNAvn0rZ7Blaw/OGwhjSvVL92BiVj4a1RH91UrYUQZxo9j/Oev/w8uOvVN2LV9G4ZHxnKYGaE9O41DD38Gzrnqa9jvwEPRW5gCz20CdAIi5Uwyc8ZacrZJJHcanP1d8YstV8Il59h+FMnMIyCpcNLZn8Kr3/k+tOdmHO2nYQMZxXjgnt9A6xRx3CgobUcXzahKWBDYt+PvVYBfAwHkRz5yzolSqn0znRwRQkuIKFeukZchUqWgYmN+zosot//kFlxx9nuQJj3EzVZGE0iF2endOOr5/x0fuOTzGJ1YgWR+BzC/OV/LorJkVdSAUBFkFEOquEgAVTwEIRWEiiFUnMFTT3wLIYHePEzaBeIxHH7U32B0cgV+8/MfA0SQUiLVGlGjgc0b7sVD9/0e/+05x6LRaiFNEwghC0U0eVpWIgqqRnwFG1l6ISEEGa13l2Rcqg0JEja+txXDFX1/NacoiLYiwVIRfvj1L+JLl52PuNGEkLK4Tnt2Gi981VtxwhmfgJASyexW8MJWF2baZUwG5rZvgk46AEnopIuRlfsiHhrDzNYNOeSTYDYYW/0ExEOjMEZbZc38eiYFNSaAsXWIohi//Mkt+OyFH8ipkGYWq5TC/Ow0Dn3aM3D6xddi5Zp9M2IujxsFGAkxw4WIoN4xmmzLKyWJw4aWdLRzg5AcvSIJ9BKs3KLWX/tJfPP6yzA8Ol7GETZYaM/jNe86DW846UMwhqHnHgEv7vAGv/y8kBGW5qdw+1cuQNpbBEOgtzSP/Y84Fnsd/Az86uuXIh4aARsg7S7giJf9A9b9xTFIOm1AiKrWx6SgeAQYPQBRo4l7f/dLXHb2uzE/vRut4VHoNIGMsti0zxMOwPsu+hwOOPSpxSQEd9UEpZwcUH4DhoNsqJ101KgH7FmnqgbIGA0pFYgIn7/4DHzjn/4Rw2OTJdduUnQ7HbzrwxfhDSd9qMD4ZmF7lsk66Ikc7A0whIpAMoaMm2g0h0EwMEkXMm5CxU2IqAEVNzMXZNUn3Bo1AyTBvTZ49kEknTYOO+JZOPeqr2HvdU/EwvxsVklLEgyPjWPHti34+HvfjHvu+DmiOC/u1NDx4JoqTp8D8zedcSgPsBVkhbbRq2v6NV3KLF+pCEuLbVx+1on4t2/dgNHJlWCjIaRA0usCIJx20TX429e+A0nSA89uAnd2Z5wO+XsG2KuqCZh8XqTIPKVmAimVvxxBKQkm5IymX4ny9EqkwOkSeGYDkoUZrD3wUJx3zXo8+YhnYW56CjKKoNMUzdYQOkuLuOT978Bt//otRHGcgQB/HxlbaSiFlXWhVSNQF8srukYOaObLypBUCjO7duATpx+PX/z79zA6uQomzVbE0kIbw6PjOOvyGzOM310EZjeCe3NZ5uqJnCr1/nyCe4tz0Evz6C3OodOeBhsNkMTi7BS6C7NIlubRa89Cp0kWHIMcfR92GhBJwGjw3CYk7d0YX7EaZ15+I579oldgdmoX8i2nEHm58rMXno7v3nhNQAhGTrk1mPgGtLFuSbIfhD29TyEvr0ml2TCEEJjetR0Xn/ZWPLrpAQyNjiNJeoiiCO25Gazd/2C8/xOfx9oDD0FvaR40/zA47ZYYf4Ayoh+LjE6x86F7oHtLmR81GhN7H4h4aAzbN90DUQAAYNUBT0NzeDwLwkXZ2ycR+itO9HXJwMhaRGN7gxj4X5edh+999ToMj01YGh9gdmon3nLyWXjNCe+HTlOQEDXqcK4tTYYrYuRlvDkl4TB9FWEWYJhBQuBH3/wSNt17D4bGxqHTBFEUYW56Ck96+lE45+p/xtoDD0GyNA/MbSwHP4eLddwTefa1sHsbZh97CPO7H8X8zs2Y3/0YTJpgcWor5ndtweyOzWjveiQLviQKisDPDMip1JW5As8/grS9A5oZ73j/BTj+veeis9AulBzMjImVq3HLTddh2+aNWUA2Jlz1IgrI4avoSLmVLbJCl7vLw2E8HYYwu2J7bhZCSkghoUljfnoKf3XscXjPeZej2RpCqg2oswusk8ztsAkyq26VLWcUhULSnsbGX92CpLsEoRR6i3N4wuHPh5AK9//8G5nFMyPpzGNoYg0m9jkIOu1B/CkNYYQEL+wAmpNIDeEVx78bK9fsg+s+/mEkvR6GR0aQpimSJEGaB+NKbwp4+tC6Yn11AsgVwlq6T4To6aKQJMDMeOGr3oo7bv0Bdu94DHEjxkvedALeftr5ABHSNIUQEjrt5AkWh2sLdspulTc5t9B4aAwyigEhIUig0RoGERAPjyNqjWbsohAgqVC24Sg5JF6GuCAgg6hsABkj6fXwnBe/EuMrVuO6j38Q27dshjEaL3vT32O/Aw9B1jiA3C4I7LGlldzAFXypsN4F/mYYb0WUN8lEURoHHPpUfPSfvoN77rgN+x1wCA474qis2KE1sh1PvKw1WEEHoS17rBMgT66IDdKkl60kY6B1CiEIbDSM0ajSXDWFpRoZCQGQMlNWPO0vn4MLr78Zd97275hctQZH/NXzYXL63CcPChY01G4k0HohUBGjsoDMNTyYD6+EgE5TrFm7P9as3T9jP3PrICFqTI2Cgqzq4GcvIqSEiJoZpR03kPaWIOIhRK0xkJQQQmSfURGiuFW4uNB2tpoinS06LP5NSok0STA+uQovePkbClo9LCxzd9cv2xEAIWHWoAck8spx7iZltpTJJIT7gCSgp+4D9xYyXqYihaxZDpYBdBdnodMeSCiwTjOXpCIsze225PKM5sgkhFLOdto9svz8OeXKw0AyLuMUUY79DRiUuTn/e7UNdnyDJScTDrsgeLvL7aVpKdiI3dovEUFIWd1ZTlQ/sLScVy5zj+boCuTdMAAi6DSB0QZDE2ssoJYV4Msd8jW+v7pF3lU3+/JKIUAQ1q7P6jtxIJHsf94mJewyi6pyFVUum5nLm3pydb9+TEGFBYe7N9GeIpTcNegUWhtIQYhbLUStRhbUjUG6tIgkSQvWkkDVlVzpimPv1kaYs7f2pdV1VSlwYyALIy+fyfKAQAygZZKHiq+rWIHVVywYMyjAcv5pP8YYtEaG0eumuOs3d2Lb1q1IU4OJiTE85fCnY8U+e6M7P2dtDKlZUeQhL8dAOFhdo0p/I1j7Dyrgpq4RUwiGisADUm25pbI9tLKjJCBboaD6q5YFCdNBBs2RUdz169/gG1++AZs2PFAQY8zAyr32wouOewVe/upXQesUrE2AewnsQfNlkn03441mAc48aOuYOHt/H+ynVJkAM1iHzTxY+cu2hXibn+0ijW8ezIM1j9auFKMNmqOj+MVPforPfvpSMDNaQ0N5cMx86sL8HG743NXY+sgjOOn005GaTg3ERbVh3CBE7AvSKhqowHgUaqBciMbl7hq/SaFADdIJu6NAYCUKqEM4IFilgfMcnviMa4qbTWx+cCOuv+oziKIIQ8PDMMbA6Azza60hpcSq1atx679+Dz/49rfRGB7KOjhSGJiEnoOdD5QbRkp5K7v1bkuOWYxZoDeRW7AfJEuBr29BcAtqXQGC/J6GzkNwbZyrFRXnO85FFOPH37sZC+35bOuRtQmPnB0vBq2hIfzo5u9gfmYWSinr8QYX8KsdGW0OLJTZItu4R/5aKEe6Kvqq3iFAR7syOqoryITUaVRtIVkLQ5cDQFQmQkvz87j/j39Es9l0V5c/CcYgimNM7d6NjQ9sgGo0SrKMeaAh0QChQSHACIl1C67fI+OC1/HabLoFGX9PVPgaHNiUVtmmE2BOg4xh3Z+t1SeEwOLiIhbbbVC2obxmAMv7pWmCuZkZQIh6f0cBxjIYsNntuuV8b5Bb9dxwaEyqLojCjLylWi3KlXb5Eq6OaNCg1sWPikzNiz3M9a6w74P7SWB/012tbwu5owF9TwluHyJmDpYdXZfl1fdqnl8E3UktReA2sqsmZlTRvVQ4JicwcX2y5jdlYlNdOF5ptD03WyjtqNLyDF4bGVQ7sgwAZbDyCn8fRbCpIbm16GCdvSpN9CMi13SDouDMF91OKoNJy2Sb3krjit8rgh1ZFu/g6SjCX7/45VixZh/oJAnT6L6cksgroHBAkGZtU60YDRw35bf3KVAUsbNBIzwBtTv8vF+EZVlSV8DLy+POUAsxbxKpJq4IIdHtLOHAQ5+GUz56DV7w0lej3Z7P/H8oRfUrgE7dmwLuvJxsJt/FsNeAkP2ymDtuyKT34Uw42BM5xHwOQHMc2ETMIephT2kIS5VRg2KM0Wg0mnh4w724/pIzcN/dv8HIyKhV7qRqxkuh7Du886W/spltprykzqlWJFrN/PtdGrk+E66naWvhqKebL1P2cu8UBS19D2niXBXHzAM2UQj0ukv40be+jNbQCGQUlVaLARk3Idz2OMAE9D06hXrbeVu1XOqeApVXqtEF5YGGQ+xoqBhjt2oJo+fc/QWaIWG5bud+0abcqVNddNnLj4xPIopiS7NTc5ciGCOA9EKI1COa2Sr02wHY2gXqbHL34gZZzye8tLP0Wg5LGGi45EFhGpBNkbf521/y1ZSAvODGoTSmOm39Pg9cBmqu2+3CVv+egZwUKjkODYCvBRHnuGv3IhxmQ6nmIahSQKnEAqsiZK8cDiTkFaaQ4UjK2UpciASkkvmeXxt6+iJuqgyllBIkFUiUPemcLbvkCRHsUmTw5AnXBdEybQko1Fk4YD9uDAgVLPakiG7tTyIreJPTOV1kWn6ji2sKISDz1mMkJCBy8zCc9YPo9bCwsIiZmRkABKVUrrAO9VTlAhVFcYRuJ8Hi3BygGVGzkW1LkqI0GK2h0xRap3n/udxlCK6wssX7gGpkh2zvTXLqCJV459WAKjVh9j5UezZApe271QfCttZ804QQCjy7AZJSQDUB1tkAz81iZtd2zO7egZldOzG7ewfmZnajPTuNxfk5tOfn8PCORSwsdQvZuxvvXG6I8l3wjWYTe0/EWLViFM3hMYxOTGJschXGV+6FyZV7YWL1GkysWoOR0TGoOAakzCYlSYCJg8GknCoWhc5CCJF4zsEOVBmTvLBUNOtQ9ZwKO9stbdTAVBEvlC0frV3kmZ6+lJxPz8zgsYf+iC0b7sWORx/GrscexfzMFJJeBwAhipuIGy3EQyNoDo1gfM06rFw3jL0PH4GIm4iiuGjWRKCcGzKlGzNZC5terwuTdjGMJXSX5tFdnMfUzp3Y+tAm9LqLSHvd7JCEKMbw2ARW7b0v9l53EPZZdwD2PegpWLm66YyJTtMqDOdqqTGk+gi1cnN63yZJ8kul1FE61SbvaRmo9oeCH4V1HjknAwCLczPY8sBdeOie/8DWB3+P9swuMARGJlZics1+mFizDiv2WovRFXthaHwFWsPjiJpDiOIGVBTj/+WPThMk3Q563UUszc9iaX4as7sfw/T2rZjZuQUz27dgfnoHiA1ao5PY96Cn4sDDn439nnQERiZW5XIUEz7KKdSiPXDSiH3CRrFBI0mSW5VSz0tTbQSR8L2qLciyNxmEWtf3/709O4VNd/8C2x++D0SEyb3WYvUTDsbkmnUYmVyF5XqDs+Fyv5eH5wkDVCBeh0ei8rAFIpEH5AE1Z2YsTO/E1GObsevRjZh+bDO0TrF63SE48OnPwfiKvepPAqnYKtcaKzMbKaVIkuR3lPZ635RR9GqttQYgq3IUhM924fIcLrIa2hERFudnYNIUYyv3ChbW87PGXA8a2GxMfl//5RLGQAk1eIAV+xvm8ma1QkIEhGRzUzsAEhgZX1FBhO79qCJUCWqrjDFSKZEkyQ8VE290y4c1B9ighI1U4X3g8ETZgwK638cTdh9/Kl7S78gVdG1228lg9Z7Dig2ncstu4pLrh3yDYubc31uEGgmMrdgrd0G6nmAMZsGoO8io/0YPK2P0XSV05WJLj/1ltqo+TsT3Jr0vQDI6za5EmWyxrjhDwfjiH5xjW7dHMgUb1/mIzf99/elOlCvjyKMpjNaVNmWh5oSwqBiqEzVkE53brb5bGEO3p2naEaIsH5FX6CgwsN+ql+p4FLtzrZWOM6pcfKXNDSqnX4T8vGMAoaOx7FVbtFl2CyrsUynkqZL9PqI2v+kMql96CMQHlDSPlFJorTX39H+IZrP5IGB+lx+tZMrmRX6bRvZkF4BHHNVUmNirFFGgjlBXfLWpg0Ap0TrJqKLksNJe8lYb1RXGKuo/r1ZhG0tInhjqQ201eM0n0eRVu/vi4eG7BRExEX23iisoWHioNqd228tTYI+Xs7+MBpBjtFyL9qp+gPyO5ZXJJy+uULUq5288tN/JUvux/Yh+Jlx7xEmFL8q3cPLNRJT2T1Fap7W+j4gaeWCkEBNY4J5QG5ZQX+k62UfocLbKCRp1LS8DxwiGDnDz1XrBpt2wtGRU4bVqsq76ApYPHMLHNzIAk6bp05rN5r0iP05pszHmayLrXKHrWEHqq6YrA09Ogw+7cVGoBuKjFzv7doaNBml0uMpuevQv1S2bon4dVr0FD/ghqxeN//4+U8zec5UfT6WUZIz5brPZvJeZJfWPXO10Ok+Mo+j3IMRsmLJlQAidWlTlIULuqabgQQO+RwP8a231LXCAG3tNZj3EFoa/NWdE1p1BY63Usru6xZqiQujlhzwz0lQfGcfxPQBE/3BJ0Wq1HjRaXyKEFAA0OQGP3IhVYyiukoUruHiZwlcwqQp26Krs2nf7B9kZe+W0i0qto6SlKWAYtrLOPujQNhbisseSS845V9RCCGlSfVWj0bgb+TnNoszCWao4/niapndKpZRh1iWjGRA0VQ7q8aQrPoxDVenAIXmKX48NrgSq1ikc10NBjMCgcN5AFQAeYJTdMxBKBpocpES+ZD8zPi2lVGma3qfi+Oz169fLfjC2z5IURGQ6nc6hSqk7iGjUGJOdKVY54IwrBuT2gaca0oZqtV9hF+Op9IgDCmq4RyQSrMMWwt0e/URzj1QaHjvgNOMecMgbM5s8getprY9uNBq/tY+1FVaiYZhZNpvN+zlN3wgwBBGZvLspBxQPbmMNa3VQWNhUkbQM1Mt6exH66rjQoJFVD7APVggNLKEiMKhoegjhTSXsV87KZ6w2LCwGn4UQIk3T4/PBl/aZwsKrBWhmVlGz+YM07b0ZRKyUEsYY94Cf3DWQLx/x3Ind4M4p7JF7slDl96GRK2The1DU9+Uohbvz4KSl8WQMOuGVwg1brZOhHMkmEQyzFtmP7PV6JzSbzW/kx0bqsDCrHLSUmVWjMfS1JEmOM8ZMK6WkMSZl4w2Pvw3IOfWOq0GTlzmDDF4xu0IpLCOigH/kVP2g+bJBCrm1EHCuRWcFb8bGmFRJKdmYxaWlpTc2Go3r+2d2DsIeftKgiCjtdDqHRUpdL6Q8Oq8OpSBIKtJeN0K77en9xq7e2QI1SW95DVQ2K7BfuRt4ZLmvV/V37pAbE4K0NsL6WO/znNmmlkIoZP1Pf6c7nXc1RkburBv84ArwVoJsNpv3Cimfq3VyltZ6RiqlpFRkmDUbow07EtngngDyrDmsNypEM+GeQZbLsIv9Vek8w2c/QNUDnR2kVOfzQ1SC28icmY3OT0klKaUyzO00TS/aunXr0Y2RkTt/+tOf1g7+cuooBx0BwOLi4v5RFL2PiI6XUq4qy32aOTuHkgem/wP0ND4fR5x1XacQZWE7Ja5msjZ17GqS2J28upquc+68l2AVPCUJKWXxRa31DBF/NUn0Zc1m8wF/7B73BJRUP4t+AJmfn1/TarVeTkR/x8zPklKuxp/hj9F6N4h+zczf7Xa73xkeHn40H3iZs57LlvLoT7nheeedJ84//3yyIzkzTwA4GMBBWut9mPUkIJpCCDbG0H+FgRZCMAAyxnSJeRpCPCal3AjgASKassZCAuDlrP5xT4B1I8r1JuzDqj+3n5xLE7nFmz/1+/8XGOXYd8oQ18YAAAAASUVORK5CYII=" alt="গল্পঘর লোগো" style="width:40px;height:40px;border-radius:10px;object-fit:contain;flex-shrink:0;">
+          <p class="shelf-eyebrow" style="margin:0;">গল্পঘর</p>
+          
+        </div>
+        <div class="shelf-header-actions">
+          <button class="header-icon-btn" id="lastReadHeaderBtn" onclick="openLastReadFromHeader()" title="সর্বশেষ পড়া">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            </svg>
+          </button>
+          <button class="header-icon-btn" id="wishlistHeaderBtn" onclick="openWishlist()" title="উইশলিস্ট">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 3H5a2 2 0 0 0-2 2v16l7-3.5L17 21V5a2 2 0 0 0-2-2z"/>
+            </svg>
+          </button>
+          <button class="dark-toggle-btn" id="darkToggleBtn" onclick="toggleDarkMode()" title="ডার্ক মোড">🌙</button>
+          <button class="header-icon-btn" onclick="openHomeMenu()" title="মেনু" style="flex-direction:column;gap:4px;">
+            <span style="display:block;width:16px;height:2px;background:currentColor;border-radius:2px;"></span>
+            <span style="display:block;width:16px;height:2px;background:currentColor;border-radius:2px;"></span>
+            <span style="display:block;width:16px;height:2px;background:currentColor;border-radius:2px;"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="continueCard"></div>
+    <div class="shelf-greeting">
+      <span class="shelf-greeting-line"></span>
+      <span class="shelf-greeting-text">আপনার তাকসমূহ</span>
+      <span class="shelf-greeting-line"></span>
+    </div>
+    <div class="shelf" id="shelf"></div>
+  </div>
+
+  <div id="category" class="view hidden-view offscreen-right">
+    <div class="topbar" id="categoryTopbar">
+      <button class="back-btn" onclick="goBackInApp()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 class="topbar-title" id="categoryTitle">ক্যাটাগরি</h2>
+      <button class="dark-toggle-btn" id="catDarkToggleBtn" onclick="toggleDarkMode()" title="ডার্ক মোড">🌙</button>
+      <button class="icon-btn" id="editCatBtn" onclick="openEditCategory()">✎</button>
+      <button class="icon-btn danger" id="deleteCatBtn" onclick="confirmDeleteCategory()">🗑</button>
+    </div>
+    <div class="toc-wrap" id="tocWrap"></div>
+  </div>
+
+  <div id="story" class="view hidden-view offscreen-right">
+    <div class="story-ribbon"></div>
+    <div class="topbar" id="storyTopbar">
+      <button class="back-btn" onclick="goBackInApp()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 class="topbar-title" id="storyTopTitle"></h2>
+      <button class="icon-btn" id="wishlistStoryBtn" onclick="toggleWishlist(currentCatId,currentStoryId)" title="উইশলিস্ট" style="display:flex;align-items:center;justify-content:center;transition:background .2s,color .2s;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3.5L17 21V5a2 2 0 0 0-2-2z"/></svg></button>
+      <button class="menu-btn" onclick="openReaderDrawer()" title="মেনু">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <!-- drawer overlay -->
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeReaderDrawer()"></div>
+    <!-- reader drawer -->
+    <div class="reader-drawer" id="readerDrawer">
+      <button class="drawer-close" onclick="closeReaderDrawer()">✕</button>
+      <div class="drawer-section">
+        <span class="drawer-label">পটভূমির রং</span>
+        <div class="bg-swatches">
+          <div class="bg-swatch selected" style="background:#1d2733;" data-theme="dark"    onclick="setReaderBg(this,'dark')"   title="ডার্ক নীল"></div>
+          <div class="bg-swatch"          style="background:#f5efe6;" data-theme="sepia"   onclick="setReaderBg(this,'sepia')"  title="সেপিয়া"></div>
+          <div class="bg-swatch"          style="background:#1e2d25;" data-theme="green"   onclick="setReaderBg(this,'green')"  title="ফরেস্ট গ্রিন"></div>
+          <div class="bg-swatch"          style="background:#2b2b2b;" data-theme="grey"    onclick="setReaderBg(this,'grey')"   title="চারকোল ধূসর"></div>
+        </div>
+      </div>
+      <div class="drawer-section">
+        <span class="drawer-label">ফন্ট সাইজ</span>
+        <div class="font-size-row">
+          <span class="font-size-label" style="font-size:12px;">ক</span>
+          <input type="range" class="font-size-slider" id="fontSizeSlider"
+            min="13" max="26" step="any" value="17"
+            oninput="applyFontSize(this.value)">
+          <span class="font-size-label" style="font-size:18px;">ক</span>
+        </div>
+        <div style="text-align:center;margin-top:6px;">
+          <span id="fontSizeDisplay" style="font-size:12px;color:var(--reader-text,var(--paper));opacity:.5;font-family:'Hind Siliguri',sans-serif;">১৭px</span>
+        </div>
+      </div>
+      <div class="drawer-section">
+        <span class="drawer-label">ফন্ট</span>
+        <button class="drawer-btn" onclick="openFontPicker();closeReaderDrawer()">🔤 ফন্ট পরিবর্তন</button>
+      </div>
+      <div class="drawer-section">
+        <span class="drawer-label">ডার্ক মোড</span>
+        <button class="drawer-btn" id="storyDarkBtn" onclick="toggleDarkMode()">🌙 ডার্ক / লাইট টগল</button>
+      </div>
+      <div class="drawer-section">
+        <span class="drawer-label">গল্প</span>
+
+        <button class="drawer-btn" onclick="openEditStory();closeReaderDrawer()">✎ গল্প এডিট</button>
+        <div style="height:1px;background:rgba(255,255,255,0.10);margin:10px 0;border-radius:1px;"></div>
+        <button class="drawer-btn" style="color:#F0B8A8;" onclick="confirmDeleteStory();closeReaderDrawer()">🗑 গল্প মুছুন</button>
+      </div>
+    </div>
+    <div class="story-head" id="storyHead" onclick="handleStoryTap()">
+      <span class="story-cat-tag" id="storyCatTag"></span>
+      <h1 class="story-title" id="storyTitle"></h1>
+      <span class="story-meta" id="storyMeta"></span>
+    </div>
+    <div class="story-body" id="storyBody" onclick="handleStoryTap()"></div>
+  </div>
+  <div id="wishlist" class="view hidden-view offscreen-right">
+    <div class="topbar" id="wishlistTopbar">
+      <button class="back-btn" onclick="goBackInApp()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 class="topbar-title">উইশলিস্ট</h2>
+    </div>
+    <div class="toc-wrap" id="wishlistWrap"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal-card" id="modalCard"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PALETTE = [
+  {name:'sona', hex:'#B9822E'},
+  {name:'maroon', hex:'#7A2E2E'},
+  {name:'forest', hex:'#3F5B45'},
+  {name:'plum', hex:'#54395E'},
+  {name:'navy', hex:'#2B3F66'},
+  {name:'teal', hex:'#2A7F7F'},
+  {name:'rose', hex:'#A03060'},
+  {name:'slate', hex:'#4A5568'},
+  {name:'olive', hex:'#6B7A2A'},
+  {name:'copper', hex:'#8B4513'},
+  {name:'indigo', hex:'#3D3580'},
+  {name:'brick', hex:'#9E4020'},
+];
+const STORAGE_KEY = 'golpoghor-data';
+const DARK_KEY = 'golpoghor-darkmode';
+let DATA = { categories: [], favorites: [], lastRead: null };
+let currentCatId = null;
+let currentStoryId = null;
+let pickedColor = PALETTE[0].hex;
+let headerHideTimer = null;
+let scrollSaveTimer = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ---------- STORAGE ---------- */
+async function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) DATA = JSON.parse(raw);
+  }catch(e){ DATA = { categories: [], favorites: [], lastRead: null }; }
+  if(!DATA.categories) DATA.categories = [];
+  if(!DATA.favorites) DATA.favorites = [];
+  if(DATA.lastRead === undefined) DATA.lastRead = null;
+  renderShelf();
+}
+async function saveData(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+  catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
+}
+async function loadDarkMode(){
+  try{
+    if(localStorage.getItem(DARK_KEY) === 'on'){
+      document.documentElement.classList.add('dark');
+      document.getElementById('darkToggleBtn').textContent = '☀️';
+      const catBtn = document.getElementById('catDarkToggleBtn');
+      if(catBtn) catBtn.textContent = '☀️';
+      const storyBtn = document.getElementById('storyDarkBtn');
+      if(storyBtn) storyBtn.textContent = '☀️';
+    }
+  }catch(e){}
+}
+async function toggleDarkMode(){
+  const isDark = document.documentElement.classList.toggle('dark');
+  document.getElementById('darkToggleBtn').textContent = isDark ? '☀️' : '🌙';
+  const catBtn = document.getElementById('catDarkToggleBtn');
+  if(catBtn) catBtn.textContent = isDark ? '☀️' : '🌙';
+  const storyBtn = document.getElementById('storyDarkBtn');
+  if(storyBtn) storyBtn.textContent = (isDark ? '☀️' : '🌙') + ' ডার্ক / লাইট টগল';
+  try{ localStorage.setItem(DARK_KEY, isDark ? 'on' : 'off'); }catch(e){}
+}
+
+/* ── Reader drawer ── */
+function openReaderDrawer(){
+  document.getElementById('readerDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  updateWishlistDrawerBtn();
+  /* sync font size slider */
+  try{
+    const saved = localStorage.getItem(FONTSIZE_KEY);
+    const size = saved ? parseInt(saved) : 17;
+    const slider = document.getElementById('fontSizeSlider');
+    if(slider) slider.value = size;
+    const disp = document.getElementById('fontSizeDisplay');
+    if(disp) disp.textContent = toBengaliNum(size) + 'px';
+  }catch(e){}
+}
+function closeReaderDrawer(){
+  document.getElementById('readerDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+/* ── Reader background theme ── */
+const READER_BG_KEY = 'golpoghor_reader_bg';
+function setReaderBg(el, theme){
+  document.documentElement.classList.add('reader-themed');
+  // remove all theme classes
+  ['dark','sepia','green','warm','grey'].forEach(t=>{
+    document.documentElement.classList.remove('reader-bg-'+t);
+  });
+  document.documentElement.classList.add('reader-bg-'+theme);
+  // update swatch selection
+  document.querySelectorAll('.bg-swatch').forEach(s=>s.classList.remove('selected'));
+  el.classList.add('selected');
+  try{ localStorage.setItem(READER_BG_KEY, theme); }catch(e){}
+}
+function loadReaderBg(){
+  try{
+    const saved = localStorage.getItem(READER_BG_KEY);
+    if(saved){
+      document.documentElement.classList.add('reader-themed');
+      ['dark','sepia','green','warm','grey'].forEach(t=>{
+        document.documentElement.classList.remove('reader-bg-'+t);
+      });
+      document.documentElement.classList.add('reader-bg-'+saved);
+      const el = document.querySelector(`.bg-swatch[data-theme="${saved}"]`);
+      if(el){ document.querySelectorAll('.bg-swatch').forEach(s=>s.classList.remove('selected')); el.classList.add('selected'); }
+    }
+  }catch(e){}
+}
+
+/* update wishlist drawer button label — removed from drawer */
+function updateWishlistDrawerBtn(){ /* no-op: wishlist button moved to header only */ }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(str){ return escapeHtml(str); }
+
+/* ---------- VIEW SWITCHING ---------- */
+function setView(id, direction){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('hidden-view'));
+  ['home','category','story','wishlist'].forEach(v=>{
+    const el = document.getElementById(v);
+    if(!el) return;
+    if(v===id){ el.classList.remove('offscreen-right','offscreen-left'); el.classList.add('active'); }
+    else { el.classList.remove('active'); el.classList.add(direction==='back' ? 'offscreen-right' : 'offscreen-left'); }
+  });
+  setTimeout(()=>{ ['home','category','story','wishlist'].forEach(v=>{ const el=document.getElementById(v); if(el && v!==id) el.classList.add('hidden-view'); }); }, 520);
+}
+
+/* ---------- HISTORY / BACK BUTTON HANDLING ---------- */
+function safeHistory(fn){ try{ fn(); }catch(e){ /* history API unavailable in this environment, ignore */ } }
+
+function goBackInApp(){
+  const activeEl = document.querySelector('.view.active');
+  const activeView = activeEl ? activeEl.id : 'home';
+  if(activeView === 'story'){
+    if(DATA.lastRead && DATA.lastRead.storyId === currentStoryId){
+      DATA.lastRead.scrollY = window.scrollY;
+      saveData();
+    }
+    if(cameFromFavorites){ currentCatId = '__fav__'; renderFavoritesToc(); setView('category','back'); }
+    else if(cameFromWishlist){ renderWishlistToc(); setView('wishlist','back'); }
+    else { renderToc(); setView('category','back'); }
+  } else if(activeView === 'category'){
+    currentCatId = null;
+    renderShelf();
+    setView('home','back');
+  } else if(activeView === 'wishlist'){
+    setView('home','back');
+  }
+}
+
+window.addEventListener('popstate', ()=>{ goBackInApp(); });
+
+/* ---------- HOME / SHELF ---------- */
+function renderShelf(){
+  renderContinueCard();
+  updateWishlistBadge();
+  const shelf = document.getElementById('shelf');
+  const cats = DATA.categories.map(cat => `
+    <div class="spine" onclick="openCategory('${cat.id}')">
+      <div class="spine-icon-wrap" style="background:${cat.color}22;">${cat.emoji || '📚'}</div>
+      <p class="spine-name">${escapeHtml(cat.name)}</p>
+      <span class="spine-count">${cat.stories.length ? cat.stories.length + ' টি গল্প' : 'এখনও কোনো গল্প নেই'}</span>
+    </div>`).join('');
+  shelf.innerHTML = cats + `
+    <div class="spine spine-add" onclick="openAddCategory()">
+      <div class="spine-icon-wrap">＋</div>
+      <span class="spine-name">নতুন ক্যাটাগরি</span>
+    </div>`;
+}
+
+function renderContinueCard(){
+  const wrap = document.getElementById('continueCard');
+  const lr = DATA.lastRead;
+  if(!lr){ wrap.innerHTML=''; return; }
+  const cat = DATA.categories.find(c=>c.id===lr.catId);
+  const story = cat && cat.stories.find(s=>s.id===lr.storyId);
+  if(!cat || !story){ wrap.innerHTML=''; return; }
+  wrap.innerHTML = `
+    <div class="continue-card" onclick="resumeLastRead()">
+      <span class="continue-label">📖 যেখানে শেষ করেছিলেন</span>
+      <p class="continue-title">${escapeHtml(story.title)}</p>
+      <span class="continue-cat">${escapeHtml(cat.name)}</span>
+    </div>`;
+}
+function resumeLastRead(){
+  const lr = DATA.lastRead;
+  if(!lr) return;
+  currentCatId = lr.catId;
+  safeHistory(()=>history.pushState({view:'story', catId:lr.catId, storyId:lr.storyId}, '', '#story'));
+  cameFromFavorites = false;
+  setView('story','forward');
+  renderStory(lr.storyId, lr.scrollY || 0);
+}
+
+/* ---------- CATEGORY / TOC ---------- */
+function openCategory(id){
+  currentCatId = id;
+  safeHistory(()=>history.pushState({view:'category', catId:id}, '', '#cat'));
+  renderToc();
+  setView('category','forward');
+}
+function getCat(){ return DATA.categories.find(c=>c.id===currentCatId); }
+
+function renderToc(){
+  const cat = getCat();
+  if(!cat) return;
+  document.getElementById('categoryTitle').textContent = cat.name;
+  document.getElementById('editCatBtn').style.display = '';
+  document.getElementById('deleteCatBtn').style.display = '';
+  const wrap = document.getElementById('tocWrap');
+  const items = cat.stories.map((s, idx)=>`
+    <div class="toc-item" onclick="openStory('${s.id}')">
+      <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
+      <div class="toc-text">
+        <p class="toc-title">${escapeHtml(s.title)}</p>
+        <p class="toc-meta">পড়ার সময় ${s.readtime}</p>
+      </div>
+    </div>`).join('');
+  const emptyMsg = cat.stories.length ? '' : `
+    <div class="empty-state">
+      <span class="em-icon">📖</span>
+      <p><b>এই বিভাগে এখনও কোনো গল্প নেই।</b></p>
+      <p>নিচের বাটনে চাপ দিয়ে প্রথম গল্পটা যুক্ত করুন।</p>
+    </div>`;
+  wrap.innerHTML = items + emptyMsg + `
+    <div class="toc-add" onclick="openAddStory()">＋ নতুন গল্প যুক্ত করুন</div>`;
+}
+
+function openFavorites(){
+  currentCatId = '__fav__';
+  safeHistory(()=>history.pushState({view:'category', catId:'__fav__'}, '', '#favorites'));
+  renderFavoritesToc();
+  setView('category','forward');
+}
+function renderFavoritesToc(){
+  document.getElementById('categoryTitle').textContent = 'পছন্দের গল্প';
+  document.getElementById('editCatBtn').style.display = 'none';
+  document.getElementById('deleteCatBtn').style.display = 'none';
+  const wrap = document.getElementById('tocWrap');
+  const favs = DATA.favorites.map(f=>{
+    const c = DATA.categories.find(c=>c.id===f.catId);
+    const s = c && c.stories.find(s=>s.id===f.storyId);
+    return (c && s) ? {c,s} : null;
+  }).filter(Boolean);
+  if(favs.length === 0){
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <span class="em-icon">❤</span>
+        <p><b>এখনও কোনো গল্প পছন্দের তালিকায় নেই।</b></p>
+        <p>গল্প পড়ার সময় হার্ট আইকনে চাপ দিয়ে যুক্ত করুন।</p>
+      </div>`;
+    return;
+  }
+  wrap.innerHTML = favs.map(({c,s}, idx)=>`
+    <div class="toc-item" onclick="openStoryFromFavorites('${c.id}','${s.id}')">
+      <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
+      <div class="toc-text">
+        <p class="toc-title">${escapeHtml(s.title)}</p>
+        <p class="toc-meta">${escapeHtml(c.name)} · পড়ার সময় ${s.readtime}</p>
+      </div>
+    </div>`).join('');
+}
+
+function openEditCategory(){
+  const cat = getCat();
+  if(!cat) return;
+  pickedColor = cat.color;
+  pickedEmoji = cat.emoji || '📚';
+  openModal(`
+    <h3 class="modal-title">ক্যাটাগরি এডিট করুন</h3>
+    <label class="field-label">ক্যাটাগরির নাম</label>
+    <input class="field-input" id="catNameInput" value="${escapeAttr(cat.name)}">
+    <label class="field-label">আইকন বেছে নিন</label>
+    ${emojiPickerHtml(cat.emoji || '📚')}
+    <label class="field-label">রং বেছে নিন</label>
+    ${colorRowHtml(pickedColor)}
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveEditCategory()">সেভ করুন</button>
+    </div>
+  `);
+}
+async function saveEditCategory(){
+  const name = document.getElementById('catNameInput').value.trim();
+  if(!name){ showToast('নাম লিখুন'); return; }
+  const cat = getCat();
+  cat.name = name; cat.color = pickedColor; cat.emoji = pickedEmoji;
+  await saveData();
+  closeModal();
+  renderToc();
+  showToast('ক্যাটাগরি আপডেট হয়েছে');
+}
+
+/* ---------- STORY ---------- */
+function openStory(id){
+  safeHistory(()=>history.pushState({view:'story', catId:currentCatId, storyId:id}, '', '#story'));
+  cameFromFavorites = false;
+  cameFromWishlist = false;
+  setView('story','forward');
+  const savedScroll = (DATA.lastRead && DATA.lastRead.storyId === id) ? (DATA.lastRead.scrollY || 0) : 0;
+  renderStory(id, savedScroll);
+  if(savedScroll > 0) showToast('আগের জায়গা থেকে চালু হয়েছে');
+}
+function openStoryFromFavorites(catId, storyId){
+  currentCatId = catId;
+  safeHistory(()=>history.pushState({view:'story', catId, storyId}, '', '#story'));
+  cameFromFavorites = true;
+  cameFromWishlist = false;
+  setView('story','forward');
+  const savedScroll = (DATA.lastRead && DATA.lastRead.storyId === storyId) ? (DATA.lastRead.scrollY || 0) : 0;
+  renderStory(storyId, savedScroll);
+  if(savedScroll > 0) showToast('আগের জায়গা থেকে চালু হয়েছে');
+}
+function renderStory(id, scrollTo){
+  currentStoryId = id;
+  const cat = getCat();
+  if(!cat) return;
+  const s = cat.stories.find(s=>s.id===id);
+  if(!s) return;
+  document.getElementById('storyCatTag').textContent = cat.name;
+  document.getElementById('storyTitle').textContent = s.title;
+  document.getElementById('storyTopTitle').textContent = s.title;
+  document.getElementById('storyMeta').textContent = `পড়ার সময় ${s.readtime}`;
+
+  /* ── Split into ~200-word numbered sections ── */
+  const rawParas = s.body.split(/\n+/).filter(p => p.trim());
+  const WORDS_PER_SECTION = 800;
+  const sections = [];
+  let currentWords = [];
+  let currentCount = 0;
+
+  rawParas.forEach(para => {
+    const wordCount = para.trim().split(/\s+/).length;
+    if(currentCount > 0 && currentCount + wordCount > WORDS_PER_SECTION) {
+      sections.push(currentWords.slice());
+      currentWords = [];
+      currentCount = 0;
+    }
+    currentWords.push(para);
+    currentCount += wordCount;
+  });
+  if(currentWords.length) sections.push(currentWords);
+
+  /* bookmark key for this story */
+  const bmKey = `golpoghor-bm-${id}`;
+  let savedBm = -1;
+  try { savedBm = parseInt(localStorage.getItem(bmKey) || '-1'); } catch(e){}
+
+  const bnNumbers = ['এক','দুই','তিন','চার','পাঁচ','ছয়','সাত','আট','নয়','দশ',
+    'এগারো','বারো','তেরো','চোদ্দ','পনেরো','ষোলো','সতেরো','আঠারো','উনিশ','বিশ'];
+
+  const html = sections.map((paras, idx) => {
+    const num = idx + 1;
+    const label = num <= bnNumbers.length ? `${bnNumbers[idx]} নং অনুচ্ছেদ` : `${num} নং অনুচ্ছেদ`;
+    const isBookmarked = savedBm === idx;
+    const parasHtml = paras.map(p => `<p>${escapeHtml(p)}</p>`).join('');
+    return `
+      <div class="para-section" id="para-sec-${idx}">
+        <div class="para-section-header">
+          <span class="para-section-num">${label}</span>
+          <span class="para-section-line"></span>
+          <button class="para-section-bookmark${isBookmarked ? ' bookmarked' : ''}"
+            onclick="toggleParaBookmark(event,'${id}',${idx})"
+            title="${isBookmarked ? 'বুকমার্ক সরান' : 'এখানে বুকমার্ক করুন'}"
+          >${isBookmarked ? '🔖' : '🏷️'}</button>
+        </div>
+        <div class="para-section-content">${parasHtml}</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('storyBody').innerHTML = html;
+
+  /* show/hide floating bookmark jump button */
+  updateBookmarkIndicator(id);
+
+  updateFavBtn();
+  updateWishlistBtn(currentCatId, id);
+  showStoryHeaderInitial();
+  DATA.lastRead = { catId: currentCatId, storyId: id, scrollY: scrollTo || 0 };
+  saveData();
+  window.scrollTo({ top: 0, behavior: 'auto' });
+  if(scrollTo > 0){
+    setTimeout(()=>{ window.scrollTo({ top: scrollTo, behavior: 'auto' }); }, 550);
+  }
+}
+function getStory(){ const cat = getCat(); return cat && cat.stories.find(s=>s.id===currentStoryId); }
+
+/* ── Paragraph Bookmark ── */
+function toggleParaBookmark(e, storyId, secIdx){
+  e.stopPropagation();
+  const bmKey = `golpoghor-bm-${storyId}`;
+  let current = -1;
+  try { current = parseInt(localStorage.getItem(bmKey) || '-1'); } catch(ex){}
+
+  const btn = e.currentTarget;
+  /* remove all bookmarks first */
+  document.querySelectorAll('.para-section-bookmark').forEach(b => {
+    b.classList.remove('bookmarked');
+    b.textContent = '🏷️';
+    b.title = 'এখানে বুকমার্ক করুন';
+  });
+
+  if(current === secIdx){
+    /* toggle off */
+    try { localStorage.removeItem(bmKey); } catch(ex){}
+    updateBookmarkIndicator(storyId);
+    showParaToast('বুকমার্ক সরানো হয়েছে');
+  } else {
+    /* set new bookmark */
+    try { localStorage.setItem(bmKey, String(secIdx)); } catch(ex){}
+    btn.classList.add('bookmarked');
+    btn.textContent = '🔖';
+    btn.title = 'বুকমার্ক সরান';
+    updateBookmarkIndicator(storyId);
+    showParaToast('বুকমার্ক সেট হয়েছে ✓');
+  }
+}
+
+function updateBookmarkIndicator(storyId){
+  const bmKey = `golpoghor-bm-${storyId}`;
+  let bm = -1;
+  try { bm = parseInt(localStorage.getItem(bmKey) || '-1'); } catch(e){}
+  let ind = document.getElementById('bmIndicator');
+  if(!ind){
+    ind = document.createElement('button');
+    ind.id = 'bmIndicator';
+    ind.className = 'bookmark-indicator';
+    ind.title = 'বুকমার্কে যান';
+    ind.textContent = '🔖';
+    ind.onclick = jumpToBookmark;
+    document.getElementById('story').appendChild(ind);
+  }
+  if(bm >= 0) ind.classList.add('visible');
+  else ind.classList.remove('visible');
+}
+
+function jumpToBookmark(){
+  const bmKey = `golpoghor-bm-${currentStoryId}`;
+  let bm = -1;
+  try { bm = parseInt(localStorage.getItem(bmKey) || '-1'); } catch(e){}
+  if(bm < 0) return;
+  const el = document.getElementById(`para-sec-${bm}`);
+  if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showParaToast('বুকমার্ক করা অনুচ্ছেদে এলেন');
+}
+
+let _paraToastTimer = null;
+function showParaToast(msg){
+  let t = document.getElementById('paraToast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'paraToast';
+    t.className = 'para-bookmark-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_paraToastTimer);
+  _paraToastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+window.addEventListener('scroll', ()=>{
+  const storyEl = document.getElementById('story');
+  if(storyEl.classList.contains('active') && currentStoryId && DATA.lastRead && DATA.lastRead.storyId===currentStoryId){
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer = setTimeout(()=>{
+      DATA.lastRead.scrollY = window.scrollY;
+      saveData();
+    }, 250);
+  }
+});
+
+/* save scroll immediately when leaving story */
+window.addEventListener('pagehide', ()=>{
+  if(currentStoryId && DATA.lastRead && DATA.lastRead.storyId===currentStoryId){
+    DATA.lastRead.scrollY = window.scrollY;
+    saveData();
+  }
+});
+window.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='hidden' && currentStoryId && DATA.lastRead && DATA.lastRead.storyId===currentStoryId){
+    DATA.lastRead.scrollY = window.scrollY;
+    saveData();
+  }
+});
+
+/* ---------- STORY HEADER AUTO-HIDE ---------- */
+function handleStoryTap(){
+  const bar = document.getElementById('storyTopbar');
+  if(bar.classList.contains('header-hidden')){
+    bar.classList.remove('header-hidden');
+    clearTimeout(headerHideTimer);
+    headerHideTimer = setTimeout(()=>{ bar.classList.add('header-hidden'); }, 5000);
+  } else {
+    bar.classList.add('header-hidden');
+    clearTimeout(headerHideTimer);
+  }
+}
+function showStoryHeaderInitial(){
+  const bar = document.getElementById('storyTopbar');
+  bar.classList.remove('header-hidden');
+  clearTimeout(headerHideTimer);
+  headerHideTimer = setTimeout(()=>{ bar.classList.add('header-hidden'); }, 5000);
+}
+
+/* ---------- FONT PICKER ---------- */
+const FONT_KEY = 'golpoghor-font';
+const FONTS = [
+  {family:'Hind Siliguri', label:'হিন্দ শিলিগুড়ি'},
+  {family:'Noto Sans Bengali', label:'নোটো সান্স বেঙ্গলি'},
+  {family:'Noto Serif Bengali', label:'নোটো সেরিফ বেঙ্গলি'},
+  {family:'Baloo Da 2', label:'বালু দা'},
+  {family:'Adorsho Lipi', label:'আদর্শ লিপি'},
+];
+function loadFontPref(){
+  try{
+    const f = localStorage.getItem(FONT_KEY);
+    if(f) document.documentElement.style.setProperty('--reading-font', `'${f}', sans-serif`);
+  }catch(e){}
+}
+function currentFontFamily(){
+  try{ return localStorage.getItem(FONT_KEY) || FONTS[0].family; }catch(e){ return FONTS[0].family; }
+}
+function openFontPicker(){
+  const current = currentFontFamily();
+  openModal(`
+    <h3 class="modal-title">পড়ার ফন্ট বেছে নিন</h3>
+    ${FONTS.map(f=>`
+      <div class="font-option ${f.family===current?'selected':''}" style="font-family:'${f.family}',sans-serif" onclick="applyFont('${f.family}')">
+        <span>${f.label}</span>
+        <span class="font-sample">বাংলা ভাষায় গল্প পড়ার নমুনা লেখা</span>
+      </div>`).join('')}
+    <div class="btn-row"><button class="btn btn-ghost" onclick="closeModal()">বন্ধ করুন</button></div>
+  `);
+}
+function applyFont(family){
+  document.documentElement.style.setProperty('--reading-font', `'${family}', sans-serif`);
+  try{ localStorage.setItem(FONT_KEY, family); }catch(e){}
+  closeModal();
+  showToast('ফন্ট পরিবর্তন হয়েছে');
+}
+
+/* font size */
+const FONTSIZE_KEY = 'golpoghor-fontsize';
+const toBengaliNum = n => String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
+function applyFontSize(px){
+  const size = parseFloat(px);
+  document.getElementById('storyBody').style.fontSize = size + 'px';
+  const slider = document.getElementById('fontSizeSlider');
+  if(slider){
+    slider.value = size;
+    const pct = ((size - 13) / (26 - 13)) * 100;
+    slider.style.setProperty('--val', pct + '%');
+  }
+  const disp = document.getElementById('fontSizeDisplay');
+  if(disp) disp.textContent = toBengaliNum(Math.round(size)) + 'px';
+  try{ localStorage.setItem(FONTSIZE_KEY, size); }catch(e){}
+}
+function loadFontSize(){
+  try{
+    const saved = localStorage.getItem(FONTSIZE_KEY);
+    const size = saved ? parseInt(saved) : 17;
+    applyFontSize(size);
+  }catch(e){ applyFontSize(17); }
+}
+
+/* ---------- FAVORITES ---------- */
+function isFavorite(catId, storyId){
+  return DATA.favorites.some(f=>f.catId===catId && f.storyId===storyId);
+}
+async function toggleFavorite(){
+  const idx = DATA.favorites.findIndex(f=>f.catId===currentCatId && f.storyId===currentStoryId);
+  if(idx>=0) DATA.favorites.splice(idx,1);
+  else DATA.favorites.push({catId:currentCatId, storyId:currentStoryId});
+  await saveData();
+  updateFavBtn();
+}
+function updateFavBtn(){
+  const btn = document.getElementById('favBtn');
+  if(!btn) return;
+  btn.textContent = isFavorite(currentCatId, currentStoryId) ? '❤' : '🤍';
+}
+
+/* ---------- MODALS ---------- */
+function openModal(html){
+  document.getElementById('modalCard').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+
+function colorRowHtml(selected){
+  return `<div class="color-row">${PALETTE.map(c=>`
+    <div class="color-dot ${c.hex===selected?'selected':''}" style="background:${c.hex}" onclick="pickedColor='${c.hex}'; document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('selected')); this.classList.add('selected')"></div>
+  `).join('')}</div>`;
+}
+
+const EMOJI_LIST = ['📚','📖','✨','🌙','💫','🔥','🌺','🎭','👻','💀','🌊','🏔️','🌸','🦋','⚔️','🧙','💝','🎪','🌿','🦁','🐉','🎵','🌈','🏡','🎯','🧠','💎','🌻','🦅','🎨'];
+let pickedEmoji = '📚';
+function emojiPickerHtml(selected){
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;">' +
+    EMOJI_LIST.map(e=>`<div onclick="pickedEmoji='${e}';document.querySelectorAll('.emoji-opt').forEach(x=>x.classList.remove('emoji-sel'));this.classList.add('emoji-sel')" class="emoji-opt ${e===selected?'emoji-sel':''}" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;border:2px solid ${e===selected?'var(--gold)':'transparent'};background:var(--surface-shadow);">${e}</div>`).join('') +
+  '</div>';
+}
+function openAddCategory(){
+  pickedColor = PALETTE[0].hex;
+  pickedEmoji = '📚';
+  openModal(`
+    <h3 class="modal-title">নতুন ক্যাটাগরি</h3>
+    <label class="field-label">ক্যাটাগরির নাম</label>
+    <input class="field-input" id="catNameInput" placeholder="যেমন: ভূতের গল্প">
+    <label class="field-label">আইকন বেছে নিন</label>
+    ${emojiPickerHtml('📚')}
+    <label class="field-label">রং বেছে নিন</label>
+    ${colorRowHtml(pickedColor)}
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveNewCategory()">যুক্ত করুন</button>
+    </div>
+  `);
+}
+async function saveNewCategory(){
+  const name = document.getElementById('catNameInput').value.trim();
+  if(!name){ showToast('নাম লিখুন'); return; }
+  DATA.categories.push({ id: uid(), name, color: pickedColor, emoji: pickedEmoji, stories: [] });
+  await saveData();
+  closeModal();
+  renderShelf();
+  showToast('ক্যাটাগরি যুক্ত হয়েছে');
+}
+function confirmDeleteCategory(){
+  const cat = getCat();
+  if(!cat) return;
+  openModal(`
+    <h3 class="modal-title">"${escapeHtml(cat.name)}" ডিলিট করবেন?</h3>
+    <p style="color:var(--slate);font-size:14px;line-height:1.7;margin:0 0 18px;">এর ভেতরের ${cat.stories.length} টি গল্পও ডিলিট হয়ে যাবে। এই কাজ ফিরিয়ে আনা যাবে না।</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-danger" onclick="deleteCategory()">ডিলিট করুন</button>
+    </div>
+  `);
+}
+async function deleteCategory(){
+  DATA.favorites = DATA.favorites.filter(f=>f.catId!==currentCatId);
+  if(DATA.lastRead && DATA.lastRead.catId===currentCatId) DATA.lastRead = null;
+  DATA.categories = DATA.categories.filter(c=>c.id!==currentCatId);
+  await saveData();
+  closeModal();
+  showToast('ক্যাটাগরি ডিলিট হয়েছে');
+  goBackInApp();
+}
+
+function openAddStory(){
+  openModal(`
+    <h3 class="modal-title">নতুন গল্প</h3>
+    <label class="field-label">গল্পের টাইটেল</label>
+    <input class="field-input" id="storyTitleInput" placeholder="শিরোনাম লিখুন">
+    <label class="field-label">পুরো গল্প</label>
+    <textarea class="field-textarea" id="storyBodyInput" placeholder="এখানে গল্পটা লিখুন বা পেস্ট করুন…"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveNewStory()">যুক্ত করুন</button>
+    </div>
+  `);
+}
+function estimateReadtime(text){
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words/200)) + ' মিনিট';
+}
+async function saveNewStory(){
+  const title = document.getElementById('storyTitleInput').value.trim();
+  const body = document.getElementById('storyBodyInput').value.trim();
+  if(!title || !body){ showToast('টাইটেল ও গল্প দুটোই লিখুন'); return; }
+  const cat = getCat();
+  cat.stories.push({ id: uid(), title, body, readtime: estimateReadtime(body) });
+  await saveData();
+  closeModal();
+  renderToc();
+  showToast('গল্প যুক্ত হয়েছে');
+}
+
+function openEditStory(){
+  const s = getStory();
+  if(!s) return;
+  openModal(`
+    <h3 class="modal-title">গল্প এডিট করুন</h3>
+    <label class="field-label">গল্পের টাইটেল</label>
+    <input class="field-input" id="storyTitleInput" value="${escapeAttr(s.title)}">
+    <label class="field-label">পুরো গল্প</label>
+    <textarea class="field-textarea" id="storyBodyInput">${escapeHtml(s.body)}</textarea>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveEditStory()">সেভ করুন</button>
+    </div>
+  `);
+}
+async function saveEditStory(){
+  const title = document.getElementById('storyTitleInput').value.trim();
+  const body = document.getElementById('storyBodyInput').value.trim();
+  if(!title || !body){ showToast('টাইটেল ও গল্প দুটোই লিখুন'); return; }
+  const s = getStory();
+  s.title = title; s.body = body; s.readtime = estimateReadtime(body);
+  await saveData();
+  closeModal();
+  renderStory(s.id, window.scrollY);
+  showToast('গল্প আপডেট হয়েছে');
+}
+function confirmDeleteStory(){
+  const s = getStory();
+  if(!s) return;
+  openModal(`
+    <h3 class="modal-title">"${escapeHtml(s.title)}" ডিলিট করবেন?</h3>
+    <p style="color:var(--slate);font-size:14px;margin:0 0 18px;">এই কাজ ফিরিয়ে আনা যাবে না।</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-danger" onclick="deleteStory()">ডিলিট করুন</button>
+    </div>
+  `);
+}
+async function deleteStory(){
+  const cat = getCat();
+  DATA.favorites = DATA.favorites.filter(f=>!(f.catId===currentCatId && f.storyId===currentStoryId));
+  if(DATA.lastRead && DATA.lastRead.storyId===currentStoryId) DATA.lastRead = null;
+  cat.stories = cat.stories.filter(s=>s.id!==currentStoryId);
+  await saveData();
+  closeModal();
+  showToast('গল্প ডিলিট হয়েছে');
+  goBackInApp();
+}
+
+/* ---------- WISHLIST ---------- */
+const WISHLIST_KEY = 'golpoghor-wishlist';
+function loadWishlist(){
+  try{ const raw=localStorage.getItem(WISHLIST_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
+}
+function saveWishlist(list){
+  try{ localStorage.setItem(WISHLIST_KEY, JSON.stringify(list)); }catch(e){}
+}
+function isWishlisted(catId, storyId){
+  return loadWishlist().some(w=>w.catId===catId && w.storyId===storyId);
+}
+function toggleWishlist(catId, storyId){
+  let list = loadWishlist();
+  const idx = list.findIndex(w=>w.catId===catId && w.storyId===storyId);
+  if(idx>=0) list.splice(idx,1);
+  else list.push({catId, storyId});
+  saveWishlist(list);
+  updateWishlistBtn(catId, storyId);
+  updateWishlistBadge();
+}
+function updateWishlistBtn(catId, storyId){
+  const btn = document.getElementById('wishlistStoryBtn');
+  if(!btn) return;
+  const wishlisted = isWishlisted(catId, storyId);
+  if(wishlisted){
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="#C68A45" stroke="#C68A45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3.5L17 21V5a2 2 0 0 0-2-2z"/></svg>`;
+    btn.style.cssText += ';background:rgba(198,138,69,0.25)!important;border-color:rgba(198,138,69,0.6)!important;';
+  } else {
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3.5L17 21V5a2 2 0 0 0-2-2z"/></svg>`;
+    btn.style.cssText = btn.style.cssText.replace(/background:[^;]+;?/g,'').replace(/border-color:[^;]+;?/g,'');
+  }
+}
+function updateWishlistBadge(){
+  const btn = document.getElementById('wishlistHeaderBtn');
+  if(!btn) return;
+  const count = loadWishlist().length;
+  if(count > 0){ btn.classList.add('has-badge'); btn.setAttribute('data-count', count); }
+  else { btn.classList.remove('has-badge'); btn.removeAttribute('data-count'); }
+}
+function openWishlist(){
+  safeHistory(()=>history.pushState({view:'wishlist'}, '', '#wishlist'));
+  renderWishlistToc();
+  setView('wishlist','forward');
+}
+function renderWishlistToc(){
+  const wrap = document.getElementById('wishlistWrap');
+  const list = loadWishlist();
+  const items = list.map(w=>{
+    const c = DATA.categories.find(c=>c.id===w.catId);
+    const s = c && c.stories.find(s=>s.id===w.storyId);
+    return (c && s) ? {c,s} : null;
+  }).filter(Boolean);
+  if(items.length === 0){
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <span class="em-icon"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--slate)"><path d="M19 3H5a2 2 0 0 0-2 2v16l7-3.5L17 21V5a2 2 0 0 0-2-2z"/></svg></span>
+        <p><b>উইশলিস্ট এখনও খালি।</b></p>
+        <p>গল্প পড়ার সময় বুকমার্ক আইকনে চাপ দিয়ে যুক্ত করুন।</p>
+      </div>`;
+    return;
+  }
+  wrap.innerHTML = items.map(({c,s}, idx)=>`
+    <div class="toc-item" onclick="openStoryFromWishlist('${c.id}','${s.id}')">
+      <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
+      <div class="toc-text">
+        <p class="toc-title" style="color:#fff;">${escapeHtml(s.title)}</p>
+        <p class="toc-meta">${escapeHtml(c.name)} · পড়ার সময় ${s.readtime}</p>
+      </div>
+      <button class="icon-btn" style="flex-shrink:0;margin-left:8px;" onclick="event.stopPropagation(); removeFromWishlist('${c.id}','${s.id}')">🗑</button>
+    </div>`).join('');
+}
+function openStoryFromWishlist(catId, storyId){
+  currentCatId = catId;
+  safeHistory(()=>history.pushState({view:'story', catId, storyId}, '', '#story'));
+  cameFromFavorites = false;
+  cameFromWishlist = true;
+  setView('story','forward');
+  const savedScroll = (DATA.lastRead && DATA.lastRead.storyId === storyId) ? (DATA.lastRead.scrollY || 0) : 0;
+  renderStory(storyId, savedScroll);
+  if(savedScroll > 0) showToast('আগের জায়গা থেকে চালু হয়েছে');
+}
+function removeFromWishlist(catId, storyId){
+  let list = loadWishlist().filter(w=>!(w.catId===catId && w.storyId===storyId));
+  saveWishlist(list);
+  updateWishlistBadge();
+  renderWishlistToc();
+  showToast('উইশলিস্ট থেকে সরানো হয়েছে');
+}
+
+/* ---------- LAST READ FROM HEADER ---------- */
+function openLastReadFromHeader(){
+  const lr = DATA.lastRead;
+  if(!lr){ showToast('এখনও কোনো গল্প পড়া হয়নি'); return; }
+  const cat = DATA.categories.find(c=>c.id===lr.catId);
+  const story = cat && cat.stories.find(s=>s.id===lr.storyId);
+  if(!cat || !story){ showToast('গল্পটি আর পাওয়া যাচ্ছে না'); return; }
+  currentCatId = lr.catId;
+  cameFromFavorites = false;
+  cameFromWishlist = false;
+  safeHistory(()=>history.pushState({view:'story', catId:lr.catId, storyId:lr.storyId}, '', '#story'));
+  setView('story','forward');
+  renderStory(lr.storyId, lr.scrollY || 0);
+}
+
+/* ══════════════════════════════
+   HOME MENU / SETTINGS
+══════════════════════════════ */
+function openHomeMenu(){
+  document.getElementById('homeDrawer').classList.add('open');
+  document.getElementById('homeDrawerOverlay').classList.add('open');
+  syncPinToggleUI();
+}
+function closeHomeMenu(){
+  document.getElementById('homeDrawer').classList.remove('open');
+  document.getElementById('homeDrawerOverlay').classList.remove('open');
+}
+function syncPinToggleUI(){
+  const hasPin = !!localStorage.getItem(PIN_KEY);
+  const toggle = document.getElementById('pinToggle');
+  const slider = document.getElementById('pinToggleSlider');
+  const thumb = document.getElementById('pinToggleThumb');
+  const info = document.getElementById('pinSettingsInfo');
+  const changeBtn = document.getElementById('changePinBtn');
+  toggle.checked = hasPin;
+  if(hasPin){
+    slider.style.background = 'var(--gold)';
+    thumb.style.left = '23px';
+    info.textContent = 'PIN লক চালু আছে। অ্যাপ খুললে PIN চাইবে।';
+    changeBtn.style.display = 'block';
+  } else {
+    slider.style.background = 'rgba(255,255,255,.15)';
+    thumb.style.left = '3px';
+    info.textContent = 'PIN লক বন্ধ। যে কেউ অ্যাপ খুলতে পারবে।';
+    changeBtn.style.display = 'none';
+  }
+}
+function handlePinToggle(checked){
+  if(checked){
+    /* চালু করতে চাইলে PIN সেটআপ শুরু */
+    closeHomeMenu();
+    setTimeout(()=>{
+      pinBuffer = ''; pinSetupFirst = ''; pinMode = 'setup1';
+      document.getElementById('pinTitle').textContent = 'PIN সেট করুন';
+      document.getElementById('pinSub').textContent = '৪ সংখ্যার PIN বেছে নিন';
+      document.getElementById('pinSetupMsg').textContent = '';
+      document.getElementById('pinDots').innerHTML = `
+        <div class="pin-dot" id="pd0"></div>
+        <div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div>
+        <div class="pin-dot" id="pd3"></div>`;
+      document.querySelector('.pin-pad').innerHTML = `
+        <button class="pin-key" onclick="pinPress('1')">১</button>
+        <button class="pin-key" onclick="pinPress('2')">২</button>
+        <button class="pin-key" onclick="pinPress('3')">৩</button>
+        <button class="pin-key" onclick="pinPress('4')">৪</button>
+        <button class="pin-key" onclick="pinPress('5')">৫</button>
+        <button class="pin-key" onclick="pinPress('6')">৬</button>
+        <button class="pin-key" onclick="pinPress('7')">৭</button>
+        <button class="pin-key" onclick="pinPress('8')">৮</button>
+        <button class="pin-key" onclick="pinPress('9')">৯</button>
+        <button class="pin-key empty"></button>
+        <button class="pin-key" onclick="pinPress('0')">০</button>
+        <button class="pin-key del" onclick="pinDel()">⌫</button>`;
+      document.getElementById('pinChangeBtn').style.display = 'none';
+      /* after setup, go back to app not re-lock */
+      pinSetupCallback = ()=>{ openHomeMenu(); syncPinToggleUI(); };
+      document.getElementById('pinScreen').style.display = 'flex';
+    }, 300);
+  } else {
+    /* বন্ধ করতে চাইলে আগে বিদ্যমান PIN যাচাই করো */
+    closeHomeMenu();
+    setTimeout(()=>{
+      pinBuffer = ''; pinMode = 'verify-then-disable';
+      document.getElementById('pinTitle').textContent = 'PIN নিশ্চিত করুন';
+      document.getElementById('pinSub').textContent = 'PIN লক বন্ধ করতে বর্তমান PIN দিন';
+      document.getElementById('pinSetupMsg').textContent = '';
+      document.getElementById('pinDots').innerHTML = `
+        <div class="pin-dot" id="pd0"></div>
+        <div class="pin-dot" id="pd1"></div>
+        <div class="pin-dot" id="pd2"></div>
+        <div class="pin-dot" id="pd3"></div>`;
+      document.querySelector('.pin-pad').innerHTML = `
+        <button class="pin-key" onclick="pinPress('1')">১</button>
+        <button class="pin-key" onclick="pinPress('2')">২</button>
+        <button class="pin-key" onclick="pinPress('3')">৩</button>
+        <button class="pin-key" onclick="pinPress('4')">৪</button>
+        <button class="pin-key" onclick="pinPress('5')">৫</button>
+        <button class="pin-key" onclick="pinPress('6')">৬</button>
+        <button class="pin-key" onclick="pinPress('7')">৭</button>
+        <button class="pin-key" onclick="pinPress('8')">৮</button>
+        <button class="pin-key" onclick="pinPress('9')">৯</button>
+        <button class="pin-key empty"></button>
+        <button class="pin-key" onclick="pinPress('0')">০</button>
+        <button class="pin-key del" onclick="pinDel()">⌫</button>`;
+      document.getElementById('pinChangeBtn').style.display = 'none';
+      document.getElementById('pinScreen').style.display = 'flex';
+    }, 300);
+  }
+}
+function startChangePin(){
+  closeHomeMenu();
+  setTimeout(()=>{
+    pinBuffer = ''; pinSetupFirst = ''; pinMode = 'verify-then-change';
+    document.getElementById('pinTitle').textContent = 'বর্তমান PIN দিন';
+    document.getElementById('pinSub').textContent = 'নতুন PIN সেট করতে আগের PIN যাচাই করুন';
+    document.getElementById('pinSetupMsg').textContent = '';
+    document.getElementById('pinDots').innerHTML = `
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>`;
+    document.querySelector('.pin-pad').innerHTML = `
+      <button class="pin-key" onclick="pinPress('1')">১</button>
+      <button class="pin-key" onclick="pinPress('2')">২</button>
+      <button class="pin-key" onclick="pinPress('3')">৩</button>
+      <button class="pin-key" onclick="pinPress('4')">৪</button>
+      <button class="pin-key" onclick="pinPress('5')">৫</button>
+      <button class="pin-key" onclick="pinPress('6')">৬</button>
+      <button class="pin-key" onclick="pinPress('7')">৭</button>
+      <button class="pin-key" onclick="pinPress('8')">৮</button>
+      <button class="pin-key" onclick="pinPress('9')">৯</button>
+      <button class="pin-key empty"></button>
+      <button class="pin-key" onclick="pinPress('0')">০</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>`;
+    document.getElementById('pinChangeBtn').style.display = 'none';
+    document.getElementById('pinScreen').style.display = 'flex';
+  }, 300);
+}
+
+/* ══════════════════════════════ */
+
+/* ══════════════════════════════
+   PIN SYSTEM
+══════════════════════════════ */
+const PIN_KEY = 'golpoghor-pin';
+let pinBuffer = '';
+let pinMode = 'unlock'; // 'unlock' | 'setup1' | 'setup2'
+let pinSetupFirst = '';
+
+function initPin(){
+  const saved = localStorage.getItem(PIN_KEY);
+  const dismiss = (cb) => {
+    const ls = document.getElementById('loadingScreen');
+    ls.style.transition = 'opacity .35s ease';
+    ls.style.opacity = '0';
+    setTimeout(() => { ls.style.display = 'none'; if(cb) cb(); }, 350);
+  };
+  if(!saved){
+    setTimeout(() => dismiss(() => loadData()), 1000);
+    return;
+  }
+  pinMode = 'unlock';
+  document.getElementById('pinTitle').textContent = 'পাসওয়ার্ড দিন';
+  document.getElementById('pinSub').textContent = 'গল্পঘরে প্রবেশ করতে PIN দিন';
+  document.getElementById('pinChangeBtn').style.display = 'block';
+  pinBuffer = '';
+  updatePinDots();
+  setTimeout(() => dismiss(() => { document.getElementById('pinScreen').style.display = 'flex'; }), 1000);
+}
+
+function pinPress(digit){
+  if(pinBuffer.length >= 4) return;
+  pinBuffer += digit;
+  updatePinDots();
+  if(pinBuffer.length === 4){
+    setTimeout(()=> handlePinComplete(), 120);
+  }
+}
+
+function pinDel(){
+  pinBuffer = pinBuffer.slice(0, -1);
+  updatePinDots();
+}
+
+function updatePinDots(state='normal'){
+  for(let i=0;i<4;i++){
+    const d = document.getElementById('pd'+i);
+    d.className = 'pin-dot';
+    if(i < pinBuffer.length) d.classList.add('filled');
+    if(state==='error') d.classList.add('error');
+  }
+}
+
+let pinSetupCallback = null;
+
+function handlePinComplete(){
+  if(pinMode === 'unlock'){
+    const saved = localStorage.getItem(PIN_KEY);
+    if(pinBuffer === saved){
+      document.getElementById('pinScreen').style.display = 'none';
+      loadData();
+    } else {
+      updatePinDots('error');
+      document.getElementById('pinSetupMsg').style.color = '#e05555';
+      document.getElementById('pinSetupMsg').textContent = 'ভুল PIN! আবার চেষ্টা করুন';
+      setTimeout(()=>{ pinBuffer=''; updatePinDots(); document.getElementById('pinSetupMsg').textContent=''; }, 900);
+    }
+  } else if(pinMode === 'verify-then-disable'){
+    const saved = localStorage.getItem(PIN_KEY);
+    if(pinBuffer === saved){
+      localStorage.removeItem(PIN_KEY);
+      localStorage.removeItem(BACKUP_KEY);
+      document.getElementById('pinScreen').style.display = 'none';
+      showToast('PIN লক বন্ধ করা হয়েছে');
+      openHomeMenu(); syncPinToggleUI();
+    } else {
+      updatePinDots('error');
+      document.getElementById('pinSetupMsg').style.color = '#e05555';
+      document.getElementById('pinSetupMsg').textContent = 'ভুল PIN!';
+      setTimeout(()=>{ pinBuffer=''; updatePinDots(); document.getElementById('pinSetupMsg').textContent=''; }, 900);
+    }
+  } else if(pinMode === 'verify-then-change'){
+    const saved = localStorage.getItem(PIN_KEY);
+    if(pinBuffer === saved){
+      pinBuffer=''; pinSetupFirst=''; pinMode='setup1';
+      document.getElementById('pinTitle').textContent = 'নতুন PIN সেট করুন';
+      document.getElementById('pinSub').textContent = '৪ সংখ্যার নতুন PIN বেছে নিন';
+      document.getElementById('pinSetupMsg').textContent = '';
+      updatePinDots();
+      pinSetupCallback = ()=>{ openHomeMenu(); syncPinToggleUI(); };
+    } else {
+      updatePinDots('error');
+      document.getElementById('pinSetupMsg').style.color = '#e05555';
+      document.getElementById('pinSetupMsg').textContent = 'ভুল PIN!';
+      setTimeout(()=>{ pinBuffer=''; updatePinDots(); document.getElementById('pinSetupMsg').textContent=''; }, 900);
+    }
+  } else if(pinMode === 'setup1'){
+    pinSetupFirst = pinBuffer;
+    pinMode = 'setup2';
+    pinBuffer = '';
+    updatePinDots();
+    document.getElementById('pinTitle').textContent = 'আবার দিন';
+    document.getElementById('pinSub').textContent = 'নিশ্চিত করতে একই PIN আবার দিন';
+  } else if(pinMode === 'setup2'){
+    if(pinBuffer === pinSetupFirst){
+      localStorage.setItem(PIN_KEY, pinBuffer);
+      const backupCode = generateBackupCode();
+      localStorage.setItem(BACKUP_KEY, backupCode);
+      document.getElementById('pinSetupMsg').style.color = 'var(--gold)';
+      document.getElementById('pinSetupMsg').textContent = 'PIN সেট হয়েছে! ✓';
+      const cb = pinSetupCallback; pinSetupCallback = null;
+      if(cb){
+        /* from settings — show backup then go back */
+        setTimeout(()=>{ showBackupCode(backupCode, cb); }, 600);
+      } else {
+        setTimeout(()=>{ showBackupCode(backupCode, null); }, 600);
+      }
+    } else {
+      updatePinDots('error');
+      document.getElementById('pinSetupMsg').style.color = '#e05555';
+      document.getElementById('pinSetupMsg').textContent = 'মিলছে না! আবার শুরু করুন';
+      setTimeout(()=>{
+        pinMode='setup1'; pinBuffer=''; pinSetupFirst='';
+        updatePinDots();
+        document.getElementById('pinTitle').textContent = 'PIN সেট করুন';
+        document.getElementById('pinSub').textContent = '৪ সংখ্যার PIN বেছে নিন';
+        document.getElementById('pinSetupMsg').textContent = '';
+      }, 900);
+    }
+  }
+}
+
+const BACKUP_KEY = 'golpoghor-backup';
+
+function generateBackupCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0;i<10;i++){
+    if(i===5) code+='-';
+    code += chars[Math.floor(Math.random()*chars.length)];
+  }
+  return code;
+}
+
+function showBackupCode(code, callback){
+  document.getElementById('pinScreen').innerHTML = `
+    <div style="text-align:center;padding:24px;max-width:320px;">
+      <div style="font-size:40px;margin-bottom:16px;">🔐</div>
+      <h2 style="font-family:'Tiro Bangla',serif;color:var(--paper);font-size:20px;margin:0 0 10px;">আপনার ব্যাকআপ কোড</h2>
+      <p style="font-size:13px;color:rgba(255,255,255,.5);font-family:'Hind Siliguri',sans-serif;margin:0 0 28px;line-height:1.7;">PIN ভুলে গেলে এই কোড দিয়ে রিসেট করতে পারবেন। এখনই স্ক্রিনশট নিয়ে রাখুন!</p>
+      <div style="background:rgba(255,255,255,.08);border:1.5px solid var(--gold);border-radius:14px;padding:20px;margin-bottom:24px;">
+        <span style="font-family:monospace;font-size:26px;font-weight:700;color:var(--gold);letter-spacing:3px;">${code}</span>
+      </div>
+      <p style="font-size:12px;color:rgba(255,255,255,.35);font-family:'Hind Siliguri',sans-serif;margin:0 0 28px;">⚠️ এই কোড আর দেখানো হবে না</p>
+      <button onclick="backupCodeConfirmed()" style="background:var(--gold);border:none;color:#241405;border-radius:12px;padding:14px 32px;font-size:15px;font-weight:700;font-family:'Hind Siliguri',sans-serif;cursor:pointer;width:100%;">স্ক্রিনশট নিয়েছি, চালু করুন</button>
+    </div>`;
+  window._pinBackupCallback = callback;
+}
+
+function backupCodeConfirmed(){
+  document.getElementById('pinScreen').style.display = 'none';
+  const cb = window._pinBackupCallback;
+  window._pinBackupCallback = null;
+  if(cb) cb();
+  else loadData();
+}
+
+function pinForgot(){
+  /* show backup code entry UI */
+  document.getElementById('pinTitle').textContent = 'ব্যাকআপ কোড';
+  document.getElementById('pinSub').textContent = 'PIN সেটআপের সময় পাওয়া ১০ অক্ষরের কোড দিন';
+  document.getElementById('pinSetupMsg').textContent = '';
+  document.getElementById('pinChangeBtn').style.display = 'none';
+
+  /* replace dot row with text input */
+  document.getElementById('pinDots').innerHTML = `
+    <input id="backupInput" type="text" maxlength="11"
+      placeholder="XXXXX-XXXXX"
+      style="background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.25);color:var(--paper);border-radius:10px;padding:12px 16px;font-size:18px;font-family:monospace;letter-spacing:2px;text-align:center;width:200px;outline:none;text-transform:uppercase;"
+      oninput="this.value=this.value.toUpperCase()">`;
+
+  /* replace numpad with verify button */
+  document.querySelector('.pin-pad').innerHTML = `
+    <button onclick="verifyBackupCode()" style="grid-column:1/-1;background:var(--gold);border:none;color:#241405;border-radius:12px;padding:14px;font-size:15px;font-weight:700;font-family:'Hind Siliguri',sans-serif;cursor:pointer;width:100%;margin-top:8px;">যাচাই করুন</button>
+    <button onclick="location.reload()" style="grid-column:1/-1;background:transparent;border:none;color:rgba(255,255,255,.35);font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;padding:10px;margin-top:4px;">ফিরে যান</button>`;
+}
+
+function verifyBackupCode(){
+  const input = document.getElementById('backupInput').value.trim().toUpperCase();
+  const saved = localStorage.getItem(BACKUP_KEY);
+  if(input === saved){
+    /* correct — reset PIN */
+    localStorage.removeItem(PIN_KEY);
+    localStorage.removeItem(BACKUP_KEY);
+    pinBuffer = '';
+    pinSetupFirst = '';
+    pinMode = 'setup1';
+    /* rebuild pin screen */
+    location.reload();
+  } else {
+    document.getElementById('backupInput').style.borderColor = '#e05555';
+    document.getElementById('pinSetupMsg').style.color = '#e05555';
+    document.getElementById('pinSetupMsg').textContent = 'কোড মিলছে না!';
+    setTimeout(()=>{
+      document.getElementById('backupInput').style.borderColor = 'rgba(255,255,255,.25)';
+      document.getElementById('pinSetupMsg').textContent = '';
+    }, 1200);
+  }
+}
+
+/* allow PIN change from settings — call this from drawer if needed */
+function openPinChange(){
+  pinBuffer = '';
+  pinSetupFirst = '';
+  pinMode = 'setup1';
+  document.getElementById('pinTitle').textContent = 'নতুন PIN সেট করুন';
+  document.getElementById('pinSub').textContent = '৪ সংখ্যার নতুন PIN বেছে নিন';
+  document.getElementById('pinSetupMsg').textContent = '';
+  document.getElementById('pinChangeBtn').style.display = 'none';
+  updatePinDots();
+  document.getElementById('pinScreen').style.display = 'flex';
+}
+
+/* ══════════════════════════════ */
+
+/* ---------- INIT ---------- */
+let cameFromFavorites = false;
+let cameFromWishlist = false;
+safeHistory(()=>history.replaceState({view:'home'}, '', '#home'));
+loadDarkMode();
+loadFontPref();
+loadFontSize();
+initPin();
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(e){console.log('SW register failed', e);});
+  });
+}
+</script>
+</body>
+</html>
