@@ -1,8 +1,4 @@
-// গল্পঘর - Service Worker
-// এই ফাইলটা প্রথমবার অ্যাপ লোড হওয়ার সময় পুরো অ্যাপ ফোনে cache করে রাখে,
-// যাতে পরে ইন্টারনেট না থাকলেও অ্যাপ চলে।
-
-const CACHE_NAME = 'golpoghor-cache-v1';
+const CACHE_NAME = 'golpoghor-cache-v3';
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -11,7 +7,6 @@ const FILES_TO_CACHE = [
   './icon-512.png'
 ];
 
-// ইনস্টলের সময়: প্রয়োজনীয় ফাইলগুলো cache-এ সেভ করা
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -22,7 +17,6 @@ self.addEventListener('install', function(event) {
   );
 });
 
-// পুরনো ভার্সনের cache পরিষ্কার করা
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
@@ -36,22 +30,17 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// রিকোয়েস্ট হ্যান্ডলিং: cache-first, fail করলে network, network-ও fail করলে cache-এর index.html (offline fallback)
 self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
-
   event.respondWith(
-    caches.match(event.request).then(function(cachedResponse) {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then(function(networkResponse) {
-        return caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        });
-      }).catch(function() {
-        return caches.match('./index.html');
+    fetch(event.request).then(function(networkResponse) {
+      return caches.open(CACHE_NAME).then(function(cache) {
+        cache.put(event.request, networkResponse.clone());
+        return networkResponse;
+      });
+    }).catch(function() {
+      return caches.match(event.request).then(function(cachedResponse) {
+        return cachedResponse || caches.match('./index.html');
       });
     })
   );
