@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>গল্পঘর</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#5A3D26">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Baloo+Da+2:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.maateen.me/adorsho-lipi/font.css" rel="stylesheet">
@@ -499,13 +497,6 @@
     <div id="pinSettingsInfo" style="font-size:12px;color:rgba(255,255,255,.35);font-family:'Hind Siliguri',sans-serif;line-height:1.6;"></div>
     <button id="changePinBtn" onclick="startChangePin()" style="display:none;margin-top:10px;width:100%;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);border-radius:10px;padding:11px;font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;">🔑 PIN পরিবর্তন করুন</button>
   </div>
-  <div class="drawer-section">
-    <span class="drawer-label">ক্লাউড সিঙ্ক</span>
-    <button onclick="closeHomeMenu();openGhSetup();" style="width:100%;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);border-radius:10px;padding:11px;font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;justify-content:center;">
-      ☁️ <span id="ghSyncBtnLabel">ক্লাউড সিঙ্ক সেটআপ</span>
-    </button>
-    <div id="ghSyncInfo" style="margin-top:8px;font-size:12px;color:rgba(255,255,255,.35);font-family:'Hind Siliguri',sans-serif;line-height:1.6;"></div>
-  </div>
 </div>
 
 <div class="reading-progress-bar" id="readingProgressBar"></div>
@@ -683,6 +674,27 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- ===== Firebase (ক্লাউড স্টোরেজ + অফলাইন সিঙ্ক) ===== -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+// নিচের firebaseConfig অবজেক্টটা আপনার Firebase প্রজেক্টের কনফিগ দিয়ে পরিবর্তন করুন
+const firebaseConfig = {
+  apiKey: "AIzaSyArn3bWfpE7mMZ6CMCK8CqhNlnEldPmYPc",
+  authDomain: "golpoghor-7b8cc.firebaseapp.com",
+  projectId: "golpoghor-7b8cc",
+  storageBucket: "golpoghor-7b8cc.firebasestorage.app",
+  messagingSenderId: "940205660810",
+  appId: "1:940205660810:web:bcbf6dda13a8ee2b276b73"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+// অফলাইন ক্যাশ চালু - অফলাইনে করা পরিবর্তন ফোনে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হবে
+db.enablePersistence({ synchronizeTabs: true }).catch(function(e){ console.log('persistence error', e); });
+// সব গল্প/ক্যাটাগরি একটাই ডকুমেন্টে রাখা হচ্ছে যাতে সব ডিভাইসে একই ডেটা দেখায়
+const CLOUD_DOC = db.collection('golpoghor').doc('library');
+</script>
+
 <script>
 const PALETTE = [
   {name:'sona', hex:'#B9822E'},
@@ -700,154 +712,16 @@ const PALETTE = [
 ];
 const STORAGE_KEY = 'golpoghor-data';
 const DARK_KEY = 'golpoghor-darkmode';
-const GH_CONFIG_KEY = 'golpoghor-gh-config';
-const PENDING_SYNC_KEY = 'golpoghor-pending-sync';
 let DATA = { categories: [], favorites: [], lastRead: null };
 let currentCatId = null;
 let currentStoryId = null;
 let pickedColor = PALETTE[0].hex;
 let headerHideTimer = null;
 let scrollSaveTimer = null;
-let ghConfig = { token:'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', owner:'hgfthgnjj', repo:'GolpoGhor-' };
-let isSyncing = false;
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-/* ══════════════════════════════
-   GITHUB SYNC SYSTEM
-══════════════════════════════ */
-function loadGhConfig(){
-  try{ const r=localStorage.getItem(GH_CONFIG_KEY); return r?JSON.parse(r):null; }catch(e){ return null; }
-}
-function saveGhConfig(cfg){
-  try{ localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg)); }catch(e){}
-}
-function isGhConfigured(){ return !!(ghConfig && ghConfig.token && ghConfig.owner && ghConfig.repo); }
-
-function showSyncStatus(msg, type='info'){
-  let el = document.getElementById('syncStatusBar');
-  if(!el){
-    el = document.createElement('div');
-    el.id = 'syncStatusBar';
-    el.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 16px;border-radius:20px;font-size:12px;font-family:\'Hind Siliguri\',sans-serif;z-index:99;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.15);';
-    document.body.appendChild(el);
-  }
-  const colors = { info:'var(--gold)', success:'#4caf50', error:'#e05555', syncing:'var(--gold)' };
-  el.style.borderColor = colors[type] || 'rgba(255,255,255,.15)';
-  el.textContent = msg;
-  el.style.opacity = '1';
-  if(type !== 'syncing') setTimeout(()=>{ el.style.opacity='0'; }, 3000);
-}
-
-async function ghGetFile(path){
-  const c = ghConfig;
-  const url = `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${path}`;
-  const res = await fetch(url, { headers:{ Authorization:`token ${c.token}`, Accept:'application/vnd.github.v3+json' }});
-  if(res.status === 404) return null;
-  if(!res.ok) throw new Error('GitHub read error: ' + res.status);
-  return await res.json();
-}
-
-async function ghPutFile(path, content, sha){
-  const c = ghConfig;
-  const url = `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${path}`;
-  const body = { message:'golpoghor sync', content: btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2)))) };
-  if(sha) body.sha = sha;
-  const res = await fetch(url, { method:'PUT', headers:{ Authorization:`token ${c.token}`, Accept:'application/vnd.github.v3+json', 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-  if(!res.ok) throw new Error('GitHub write error: ' + res.status);
-  return await res.json();
-}
-
-async function syncToGitHub(silent=false){
-  if(!isGhConfigured() || isSyncing) return;
-  if(!navigator.onLine){
-    try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
-    if(!silent) showSyncStatus('অফলাইন — নেট আসলে সিঙ্ক হবে', 'info');
-    return;
-  }
-  isSyncing = true;
-  if(!silent) showSyncStatus('সিঙ্ক হচ্ছে...', 'syncing');
-  try{
-    const dataPath = 'data/stories.json';
-    const existing = await ghGetFile(dataPath);
-    const sha = existing ? existing.sha : undefined;
-    await ghPutFile(dataPath, DATA, sha);
-    localStorage.removeItem(PENDING_SYNC_KEY);
-    if(!silent) showSyncStatus('✓ সিঙ্ক সম্পন্ন', 'success');
-  }catch(e){
-    try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(err){}
-    if(!silent) showSyncStatus('সিঙ্ক ব্যর্থ — পরে চেষ্টা হবে', 'error');
-  }
-  isSyncing = false;
-}
-
-async function syncFromGitHub(){
-  if(!isGhConfigured() || !navigator.onLine) return false;
-  try{
-    const file = await ghGetFile('data/stories.json');
-    if(!file) return false;
-    const content = JSON.parse(decodeURIComponent(escape(atob(file.content.replace(/\n/g,'')))));
-    if(content && content.categories){
-      DATA = content;
-      if(!DATA.favorites) DATA.favorites = [];
-      if(DATA.lastRead === undefined) DATA.lastRead = null;
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
-      return true;
-    }
-  }catch(e){}
-  return false;
-}
-
-window.addEventListener('online', async ()=>{
-  const pending = localStorage.getItem(PENDING_SYNC_KEY);
-  if(pending && isGhConfigured()){
-    showSyncStatus('নেট পাওয়া গেছে, সিঙ্ক হচ্ছে...', 'syncing');
-    await syncToGitHub(false);
-  }
-});
-
-function openGhSetup(){
-  const cfg = ghConfig || {};
-  openModal(`
-    <h3 class="modal-title">☁️ ক্লাউড সিঙ্ক সেটআপ</h3>
-    <p style="font-size:13px;color:var(--slate);margin:0 0 16px;line-height:1.7;">GitHub-এ গল্প সেভ করলে সব ডিভাইসে একই গল্প দেখাবে।</p>
-    <label class="field-label">GitHub Token</label>
-    <input class="field-input" id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxx" value="${cfg.token||''}">
-    <label class="field-label">GitHub Username</label>
-    <input class="field-input" id="ghOwner" placeholder="আপনার GitHub username" value="${cfg.owner||''}">
-    <label class="field-label">Repository নাম</label>
-    <input class="field-input" id="ghRepo" placeholder="GolpoGhor-" value="${cfg.repo||'GolpoGhor-'}">
-    <div class="btn-row">
-      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
-      <button class="btn btn-primary" onclick="saveGhSetup()">সেভ ও সিঙ্ক করুন</button>
-    </div>
-    ${isGhConfigured() ? '<button class="btn btn-danger" style="width:100%;margin-top:8px;" onclick="disableGhSync()">সিঙ্ক বন্ধ করুন</button>' : ''}
-  `);
-}
-
-async function saveGhSetup(){
-  const token = document.getElementById('ghToken').value.trim();
-  const owner = document.getElementById('ghOwner').value.trim();
-  const repo = document.getElementById('ghRepo').value.trim();
-  if(!token || !owner || !repo){ showToast('সব তথ্য পূরণ করুন'); return; }
-  ghConfig = { token, owner, repo };
-  saveGhConfig(ghConfig);
-  closeModal();
-  showToast('সেটআপ সেভ হয়েছে!');
-  showSyncStatus('প্রথম সিঙ্ক হচ্ছে...', 'syncing');
-  const pulled = await syncFromGitHub();
-  if(pulled){ renderShelf(); showSyncStatus('✓ GitHub থেকে ডেটা নামানো হয়েছে', 'success'); }
-  else { await syncToGitHub(false); }
-}
-
-function disableGhSync(){
-  ghConfig = null;
-  localStorage.removeItem(GH_CONFIG_KEY);
-  closeModal();
-  showToast('ক্লাউড সিঙ্ক বন্ধ করা হয়েছে');
-}
-
-/* ---------- STORAGE ---------- */
+/* ---------- STORAGE (লোকাল + ক্লাউড) ---------- */
 async function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -856,19 +730,38 @@ async function loadData(){
   if(!DATA.categories) DATA.categories = [];
   if(!DATA.favorites) DATA.favorites = [];
   if(DATA.lastRead === undefined) DATA.lastRead = null;
-  if(navigator.onLine){
-    showSyncStatus('ডেটা চেক করা হচ্ছে...', 'syncing');
-    const pulled = await syncFromGitHub();
-    if(pulled) showSyncStatus('✓ আপডেট হয়েছে', 'success');
-    else { const el=document.getElementById('syncStatusBar'); if(el) el.style.opacity='0'; }
-  }
   renderShelf();
-}
 
+  // ক্লাউড থেকে রিয়েল-টাইম সিঙ্ক — অন্য ডিভাইসে আপলোড করা গল্পও এখানে অটো চলে আসবে
+  try{
+    CLOUD_DOC.onSnapshot(function(doc){
+      if(doc.exists){
+        const cloud = doc.data();
+        if(cloud && cloud.data){
+          DATA = cloud.data;
+          if(!DATA.categories) DATA.categories = [];
+          if(!DATA.favorites) DATA.favorites = [];
+          if(DATA.lastRead === undefined) DATA.lastRead = null;
+          try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+          renderShelf();
+        }
+      } else {
+        // ক্লাউডে এখনও কিছু নেই (প্রথমবার) - লোকাল ডেটা ক্লাউডে আপলোড করে দেওয়া হচ্ছে
+        CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+          .catch(function(e){ console.log('initial cloud push failed', e); });
+      }
+    }, function(err){ console.log('cloud sync error', err); });
+  }catch(e){ console.log('cloud listener setup failed', e); }
+}
 async function saveData(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
   catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
-  if(isGhConfigured()) syncToGitHub(true);
+  try{
+    await CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }catch(e){
+    // অফলাইনে থাকলে এই সেভটা Firestore-এর নিজের ক্যাশে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হয়ে যাবে
+    console.log('cloud save queued (offline) or failed', e);
+  }
 }
 async function loadDarkMode(){
   try{
@@ -1727,15 +1620,6 @@ function openHomeMenu(){
   document.getElementById('homeDrawer').classList.add('open');
   document.getElementById('homeDrawerOverlay').classList.add('open');
   syncPinToggleUI();
-  const lbl = document.getElementById('ghSyncBtnLabel');
-  const info = document.getElementById('ghSyncInfo');
-  if(isGhConfigured()){
-    if(lbl) lbl.textContent = 'সিঙ্ক চালু আছে — পরিবর্তন করুন';
-    if(info) info.textContent = `${ghConfig.owner}/${ghConfig.repo} — গল্প সেভ হলে অটো আপলোড হয়।`;
-  } else {
-    if(lbl) lbl.textContent = 'ক্লাউড সিঙ্ক সেটআপ';
-    if(info) info.textContent = 'সেটআপ করলে সব ডিভাইসে গল্প একই থাকবে।';
-  }
 }
 function closeHomeMenu(){
   document.getElementById('homeDrawer').classList.remove('open');
