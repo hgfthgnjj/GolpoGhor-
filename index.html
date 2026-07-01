@@ -732,21 +732,32 @@ async function loadData(){
   if(DATA.lastRead === undefined) DATA.lastRead = null;
   renderShelf();
 
-  // ক্লাউড থেকে রিয়েল-টাইম সিঙ্ক — অন্য ডিভাইসে আপলোড করা গল্পও এখানে অটো চলে আসবে
   try{
     CLOUD_DOC.onSnapshot(function(doc){
       if(doc.exists){
         const cloud = doc.data();
         if(cloud && cloud.data){
-          DATA = cloud.data;
-          if(!DATA.categories) DATA.categories = [];
-          if(!DATA.favorites) DATA.favorites = [];
-          if(DATA.lastRead === undefined) DATA.lastRead = null;
-          try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
-          renderShelf();
+          const cloudData = cloud.data;
+          if(!cloudData.categories) cloudData.categories = [];
+          const localCount = DATA.categories.length;
+          const cloudCount = cloudData.categories.length;
+
+          if(cloudCount >= localCount){
+            // ক্লাউডে বেশি বা সমান ডেটা আছে — ক্লাউডটাই নেওয়া হচ্ছে
+            DATA = cloudData;
+            if(!DATA.favorites) DATA.favorites = [];
+            if(DATA.lastRead === undefined) DATA.lastRead = null;
+            try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+            renderShelf();
+          } else {
+            // লোকালে বেশি ডেটা আছে — লোকালটা ক্লাউডে পুশ করা হচ্ছে
+            console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
+            CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+              .catch(function(e){ console.log('merge push failed', e); });
+          }
         }
       } else {
-        // ক্লাউডে এখনও কিছু নেই (প্রথমবার) - লোকাল ডেটা ক্লাউডে আপলোড করে দেওয়া হচ্ছে
+        // ক্লাউডে কিছু নেই — লোকাল ডেটা ক্লাউডে আপলোড
         CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
           .catch(function(e){ console.log('initial cloud push failed', e); });
       }
