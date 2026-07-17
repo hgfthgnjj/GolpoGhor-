@@ -729,6 +729,9 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+// ভবিষ্যতে কোনো ফিল্ড ভুলবশত undefined হয়ে গেলেও যেন পুরো সেভ ব্যর্থ না হয়ে যায়
+// (Firestore ডিফল্টভাবে undefined ভ্যালু থাকলে পুরো write-টাই এরর দিয়ে বাতিল করে দেয়)
+db.settings({ ignoreUndefinedProperties: true });
 // অফলাইন ক্যাশ চালু - অফলাইনে করা পরিবর্তন ফোনে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হবে
 db.enablePersistence({ synchronizeTabs: true }).catch(function(e){ console.log('persistence error', e); });
 // প্রতিটা গল্প এখন আলাদা ডকুমেন্টে জমা থাকে (Firestore-এর একটা ডকুমেন্টে ১ MB লিমিট আছে,
@@ -794,7 +797,7 @@ function countStories(d){
 async function pushAllToCloud(){
   const metaData = {
     categories: DATA.categories.map(function(c){
-      return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type, storyIds: c.stories.map(function(s){ return s.id; }) };
+      return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null, storyIds: c.stories.map(function(s){ return s.id; }) };
     }),
     favorites: DATA.favorites,
     lastRead: DATA.lastRead,
@@ -1144,7 +1147,10 @@ function renderToc(){
   document.getElementById('deleteCatBtn').style.display = '';
   const isSeries = cat.type === 'series';
   const fab = document.getElementById('categoryFab');
-  if(fab) fab.title = isSeries ? 'নতুন পর্ব যুক্ত করুন' : 'নতুন গল্প যুক্ত করুন';
+  if(fab){
+    fab.style.display = '';
+    fab.title = isSeries ? 'নতুন পর্ব যুক্ত করুন' : 'নতুন গল্প যুক্ত করুন';
+  }
   const wrap = document.getElementById('tocWrap');
   const readSet = getReadSet();
   const storiesOrdered = isSeries
@@ -1196,6 +1202,8 @@ function renderFavoritesToc(){
   document.getElementById('categoryTitle').textContent = 'পছন্দের গল্প';
   document.getElementById('editCatBtn').style.display = 'none';
   document.getElementById('deleteCatBtn').style.display = 'none';
+  const favFab = document.getElementById('categoryFab');
+  if(favFab) favFab.style.display = 'none';
   const wrap = document.getElementById('tocWrap');
   const favs = DATA.favorites.map(f=>{
     const c = DATA.categories.find(c=>c.id===f.catId);
@@ -1654,6 +1662,7 @@ async function deleteCategory(){
 
 function openAddStory(){
   const cat = getCat();
+  if(!cat){ showToast('আগে একটা ক্যাটাগরি/সিরিজে ঢুকুন'); return; }
   const isSeries = cat && cat.type === 'series';
   const nextEp = isSeries ? (cat.stories.reduce((m,s)=>Math.max(m, s.epNum||0),0)+1) : '';
   openModal(`
@@ -1676,6 +1685,7 @@ function estimateReadtime(text){
 }
 async function saveNewStory(){
   const cat = getCat();
+  if(!cat){ showToast('ক্যাটাগরি খুঁজে পাওয়া যায়নি'); closeModal(); return; }
   const isSeries = cat.type === 'series';
   const titleInput = document.getElementById('storyTitleInput');
   const body = document.getElementById('storyBodyInput').value.trim();
@@ -2419,6 +2429,8 @@ function renderAllStoriesToc(){
   document.getElementById('categoryTitle').textContent = 'সব গল্প';
   document.getElementById('editCatBtn').style.display = 'none';
   document.getElementById('deleteCatBtn').style.display = 'none';
+  const fab = document.getElementById('categoryFab');
+  if(fab) fab.style.display = 'none';
   const wrap = document.getElementById('tocWrap');
   const readSet = getReadSet();
   const all = [];
