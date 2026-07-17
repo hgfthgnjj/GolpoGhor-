@@ -732,7 +732,7 @@ const PALETTE = [
 ];
 const STORAGE_KEY = 'golpoghor-data';
 const DARK_KEY = 'golpoghor-darkmode';
-let DATA = { categories: [], favorites: [], lastRead: null };
+let DATA = { categories: [], favorites: [], lastRead: null, version: 0 };
 let currentCatId = null;
 let currentStoryId = null;
 let pickedColor = PALETTE[0].hex;
@@ -758,7 +758,7 @@ function buildCloudDataFromMeta(metaRaw, storiesMap){
       .map(function(s){ return { id: s.id, title: s.title, body: s.body, readtime: s.readtime }; });
     return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, stories: stories };
   });
-  return { categories: categories, favorites: metaRaw.favorites || [], lastRead: metaRaw.lastRead === undefined ? null : metaRaw.lastRead };
+  return { categories: categories, favorites: metaRaw.favorites || [], lastRead: metaRaw.lastRead === undefined ? null : metaRaw.lastRead, version: metaRaw.version || 0 };
 }
 
 function countStories(d){
@@ -773,7 +773,8 @@ async function pushAllToCloud(){
       return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, storyIds: c.stories.map(function(s){ return s.id; }) };
     }),
     favorites: DATA.favorites,
-    lastRead: DATA.lastRead
+    lastRead: DATA.lastRead,
+    version: DATA.version || 0
   };
   await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
@@ -831,8 +832,13 @@ async function loadData(){
       const cloudData = buildCloudDataFromMeta(metaRaw, storiesMap);
       const localCount = countStories(DATA);
       const cloudCount = countStories(cloudData);
+      const localVersion = DATA.version || 0;
+      const cloudVersion = cloudData.version || 0;
+      // ভার্সন নাম্বার দিয়ে আগে যাচাই করা হয় (আসল পরিবর্তন কিনা); ভার্সন সমান হলে
+      // (যেমন পুরনো ডেটা যেখানে ভার্সন নেই) গল্পের সংখ্যা দিয়ে সিদ্ধান্ত নেওয়া হয়
+      const cloudWins = cloudVersion > localVersion || (cloudVersion === localVersion && cloudCount >= localCount);
 
-      if(cloudCount >= localCount){
+      if(cloudWins){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
@@ -859,9 +865,12 @@ async function loadData(){
     function applyIfCloudNewer(){
       if(lastMeta === null || lastStories === null) return;
       const cloudData = buildCloudDataFromMeta(lastMeta, lastStories);
-      const localCount = countStories(DATA);
-      const cloudCount = countStories(cloudData);
-      if(cloudCount >= localCount){
+      const localVersion = DATA.version || 0;
+      const cloudVersion = cloudData.version || 0;
+      // শুধুমাত্র ক্লাউডের ভার্সন লোকালের চেয়ে বেশি হলেই (মানে সত্যিকার অন্য ডিভাইস থেকে
+      // পরিবর্তন এসেছে) ওভাররাইট করা হয় — নিজের পাঠানো সেভের প্রতিধ্বনি (echo) হলে ভার্সন
+      // সমান থাকবে, তাই সেটা এড়িয়ে যাওয়া হবে এবং সদ্য করা এডিট মুছে যাবে না
+      if(cloudVersion > localVersion){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
@@ -884,6 +893,7 @@ async function loadData(){
   }catch(e){ console.log('cloud listener setup failed', e); }
 }
 async function saveData(){
+  DATA.version = (DATA.version || 0) + 1;
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
   catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
   try{
