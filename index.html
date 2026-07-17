@@ -62,6 +62,10 @@
   .fav-launch-btn:active{transform:scale(.985);}
 
   .shelf{padding:10px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .shelf.shelf-plain-list{display:block;padding:6px 22px 0;}
+  .shelf.shelf-plain-list .toc-item{padding:18px 0;border-bottom-color:rgba(255,255,255,.12);}
+  .shelf.shelf-plain-list .toc-title{color:var(--paper);}
+  .shelf.shelf-plain-list .toc-meta{color:#D9C4A8;}
   .spine{--c:var(--maroon);background:#fff;border-radius:16px;padding:18px 14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;border:1.5px solid #eee;position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07);transition:transform .15s,box-shadow .15s;text-align:center;}
   .spine:active{transform:scale(.96);box-shadow:0 1px 6px rgba(0,0,0,.1);}
   .spine-icon-wrap{width:64px;height:64px;border-radius:16px;background:rgba(198,138,69,.18);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:12px;flex-shrink:0;}
@@ -545,13 +549,32 @@
         </div>
       </div>
     </div>
-    <div id="continueCard"></div>
     <div class="shelf-greeting">
       <span class="shelf-greeting-line"></span>
-      <span class="shelf-greeting-text">আপনার তাকসমূহ</span>
+      <span class="shelf-greeting-text">লাইব্রেরি বেছে নিন</span>
       <span class="shelf-greeting-line"></span>
     </div>
-    <div class="shelf" id="shelf"></div>
+    <div class="shelf" id="homeOptions" style="margin-top:8px;">
+      <div class="spine" onclick="openTypeList(false)">
+        <div class="spine-icon-wrap">📚</div>
+        <p class="spine-name">ছোট গল্প</p>
+        <span class="spine-count" id="shortStoryCount"></span>
+      </div>
+      <div class="spine" onclick="openTypeList(true)">
+        <div class="spine-icon-wrap">📗</div>
+        <p class="spine-name">পর্ব গল্প</p>
+        <span class="spine-count" id="seriesStoryCount"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="typeList" class="view hidden-view offscreen-right">
+    <div class="topbar" id="typeListTopbar">
+      <button class="back-btn" onclick="goBackInApp()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 class="topbar-title" id="typeListTitle">ছোট গল্প</h2>
+      <button class="dark-toggle-btn" onclick="toggleDarkMode()" title="ডার্ক মোড">🌙</button>
+    </div>
+    <div class="shelf" id="typeShelf" style="padding:14px 16px 40px;"></div>
   </div>
 
   <div id="category" class="view hidden-view offscreen-right">
@@ -734,6 +757,7 @@ const STORAGE_KEY = 'golpoghor-data';
 const DARK_KEY = 'golpoghor-darkmode';
 let DATA = { categories: [], favorites: [], lastRead: null, version: 0 };
 let currentCatId = null;
+let currentHomeType = false;
 let currentStoryId = null;
 let pickedColor = PALETTE[0].hex;
 let headerHideTimer = null;
@@ -1002,13 +1026,13 @@ function escapeAttr(str){ return escapeHtml(str); }
 /* ---------- VIEW SWITCHING ---------- */
 function setView(id, direction){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('hidden-view'));
-  ['home','category','story','wishlist'].forEach(v=>{
+  ['home','category','story','wishlist','typeList'].forEach(v=>{
     const el = document.getElementById(v);
     if(!el) return;
     if(v===id){ el.classList.remove('offscreen-right','offscreen-left'); el.classList.add('active'); }
     else { el.classList.remove('active'); el.classList.add(direction==='back' ? 'offscreen-right' : 'offscreen-left'); }
   });
-  setTimeout(()=>{ ['home','category','story','wishlist'].forEach(v=>{ const el=document.getElementById(v); if(el && v!==id) el.classList.add('hidden-view'); }); }, 520);
+  setTimeout(()=>{ ['home','category','story','wishlist','typeList'].forEach(v=>{ const el=document.getElementById(v); if(el && v!==id) el.classList.add('hidden-view'); }); }, 520);
 }
 
 /* ---------- HISTORY / BACK BUTTON HANDLING ---------- */
@@ -1027,7 +1051,17 @@ function goBackInApp(){
     else if(cameFromWishlist){ renderWishlistToc(); setView('wishlist','back'); }
     else { renderToc(); setView('category','back'); }
   } else if(activeView === 'category'){
+    const cat = DATA.categories.find(c=>c.id===currentCatId);
     currentCatId = null;
+    if(cat){
+      currentHomeType = cat.type === 'series';
+      renderTypeList();
+      setView('typeList','back');
+    } else {
+      renderShelf();
+      setView('home','back');
+    }
+  } else if(activeView === 'typeList'){
     renderShelf();
     setView('home','back');
   } else if(activeView === 'wishlist'){
@@ -1039,45 +1073,58 @@ window.addEventListener('popstate', ()=>{ goBackInApp(); });
 
 /* ---------- HOME / SHELF ---------- */
 function renderShelf(){
-  renderContinueCard();
   updateWishlistBadge();
-  const shelf = document.getElementById('shelf');
-  const cats = DATA.categories.map(cat => `
+  const normalCount = DATA.categories.filter(c=>c.type!=='series').length;
+  const seriesCount = DATA.categories.filter(c=>c.type==='series').length;
+  const shortEl = document.getElementById('shortStoryCount');
+  const seriesEl = document.getElementById('seriesStoryCount');
+  if(shortEl) shortEl.textContent = normalCount ? normalCount + ' টি ক্যাটাগরি' : 'এখনও কোনো ক্যাটাগরি নেই';
+  if(seriesEl) seriesEl.textContent = seriesCount ? seriesCount + ' টি সিরিজ' : 'এখনও কোনো সিরিজ নেই';
+
+  // ক্যাটাগরি লিস্ট ভিউ খোলা থাকলে সেটাও রিফ্রেশ করা
+  const typeListEl = document.getElementById('typeList');
+  if(typeListEl && typeListEl.classList.contains('active')) renderTypeList();
+}
+
+function openTypeList(isSeries){
+  currentHomeType = !!isSeries;
+  safeHistory(()=>history.pushState({view:'typeList', isSeries: currentHomeType}, '', '#type'));
+  renderTypeList();
+  setView('typeList','forward');
+}
+function renderTypeList(){
+  const title = document.getElementById('typeListTitle');
+  if(title) title.textContent = currentHomeType ? 'পর্ব গল্প' : 'ছোট গল্প';
+  const shelf = document.getElementById('typeShelf');
+  if(!shelf) return;
+  const cats = DATA.categories.filter(c => currentHomeType ? c.type==='series' : c.type!=='series');
+  shelf.classList.toggle('shelf-plain-list', !!currentHomeType);
+  if(currentHomeType){
+    const rowsHtml = cats.map(cat => `
+      <div class="toc-item" onclick="openCategory('${cat.id}')">
+        <span class="toc-num" style="width:auto;">${cat.emoji || '📗'}</span>
+        <div class="toc-text">
+          <p class="toc-title">${escapeHtml(cat.name)}</p>
+          <p class="toc-meta">${cat.stories.length ? cat.stories.length + ' টি পর্ব' : 'এখনও কোনো পর্ব নেই'}</p>
+        </div>
+      </div>`).join('');
+    shelf.innerHTML = rowsHtml + `
+      <div class="toc-add" onclick="openAddCategory(true)">
+        <span>＋</span><span>নতুন সিরিজ</span>
+      </div>`;
+    return;
+  }
+  const catsHtml = cats.map(cat => `
     <div class="spine" onclick="openCategory('${cat.id}')">
       <div class="spine-icon-wrap" style="background:${cat.color}22;">${cat.emoji || '📚'}</div>
       <p class="spine-name">${escapeHtml(cat.name)}</p>
       <span class="spine-count">${cat.stories.length ? cat.stories.length + ' টি গল্প' : 'এখনও কোনো গল্প নেই'}</span>
     </div>`).join('');
-  shelf.innerHTML = cats + `
-    <div class="spine spine-add" onclick="openAddCategory()">
+  shelf.innerHTML = catsHtml + `
+    <div class="spine spine-add" onclick="openAddCategory(false)">
       <div class="spine-icon-wrap">＋</div>
       <span class="spine-name">নতুন ক্যাটাগরি</span>
     </div>`;
-}
-
-function renderContinueCard(){
-  const wrap = document.getElementById('continueCard');
-  const lr = DATA.lastRead;
-  if(!lr){ wrap.innerHTML=''; return; }
-  const cat = DATA.categories.find(c=>c.id===lr.catId);
-  const story = cat && cat.stories.find(s=>s.id===lr.storyId);
-  if(!cat || !story){ wrap.innerHTML=''; return; }
-  wrap.innerHTML = `
-    <div class="continue-card" onclick="resumeLastRead()">
-      <span class="continue-label">📖 যেখানে শেষ করেছিলেন</span>
-      <p class="continue-title">${escapeHtml(story.title)}</p>
-      <span class="continue-cat">${escapeHtml(cat.name)}</span>
-    </div>`;
-}
-function resumeLastRead(){
-  const lr = DATA.lastRead;
-  if(!lr) return;
-  currentCatId = lr.catId;
-  safeHistory(()=>history.pushState({view:'story', catId:lr.catId, storyId:lr.storyId}, '', '#story'));
-  cameFromFavorites = false;
-  cameFromWishlist = false;
-  setView('story','forward');
-  renderStory(lr.storyId, lr.scrollY || 0);
 }
 
 /* ---------- CATEGORY / TOC ---------- */
@@ -1095,27 +1142,48 @@ function renderToc(){
   document.getElementById('categoryTitle').textContent = cat.name;
   document.getElementById('editCatBtn').style.display = '';
   document.getElementById('deleteCatBtn').style.display = '';
+  const isSeries = cat.type === 'series';
+  const fab = document.getElementById('categoryFab');
+  if(fab) fab.title = isSeries ? 'নতুন পর্ব যুক্ত করুন' : 'নতুন গল্প যুক্ত করুন';
   const wrap = document.getElementById('tocWrap');
   const readSet = getReadSet();
-  const items = cat.stories.map((s, idx)=>{
+  const storiesOrdered = isSeries
+    ? cat.stories.slice().sort((a,b)=>(a.epNum||0)-(b.epNum||0))
+    : cat.stories;
+  const items = storiesOrdered.map((s, idx)=>{
     const read = readSet.has(currentCatId+'::'+s.id);
+    if(isSeries){
+      const epLabel = `পর্ব ${toBengaliNum(s.epNum!=null ? s.epNum : (idx+1))}`;
+      return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
+        <div class="toc-text">
+          <p class="toc-title">${epLabel}${read?'<span class=\'read-badge\'>✓ পড়া</span>':''}</p>
+          <p class="toc-meta">পড়ার সময় ${s.readtime} · ${getWordCount(s.body).toLocaleString('bn')} শব্দ</p>
+        </div>
+      </div>`;
+    }
+    const numLabel = String(idx+1).padStart(2,'0');
     return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
       <span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>
-      <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
+      <span class="toc-num">${numLabel}</span>
       <div class="toc-text">
         <p class="toc-title">${escapeHtml(s.title)}${read?'<span class=\'read-badge\'>✓ পড়া</span>':''}</p>
         <p class="toc-meta">পড়ার সময় ${s.readtime} · ${getWordCount(s.body).toLocaleString('bn')} শব্দ</p>
       </div>
     </div>`;
   }).join('');
-  const emptyMsg = cat.stories.length ? '' : `
+  const emptyMsg = cat.stories.length ? '' : (isSeries ? `
+    <div class="empty-state">
+      <span class="em-icon">📗</span>
+      <p><b>এই সিরিজে এখনও কোনো পর্ব নেই।</b></p>
+      <p>নিচের বাটনে চাপ দিয়ে প্রথম পর্বটা যুক্ত করুন।</p>
+    </div>` : `
     <div class="empty-state">
       <span class="em-icon">📖</span>
       <p><b>এই বিভাগে এখনও কোনো গল্প নেই।</b></p>
       <p>নিচের বাটনে চাপ দিয়ে প্রথম গল্পটা যুক্ত করুন।</p>
-    </div>`;
+    </div>`);
   wrap.innerHTML = items + emptyMsg;
-  setTimeout(makeTocDraggable, 50);
+  if(!isSeries) setTimeout(makeTocDraggable, 50);
 }
 
 function openFavorites(){
@@ -1209,9 +1277,9 @@ function renderStory(id, scrollTo){
   if(!cat) return;
   const s = cat.stories.find(s=>s.id===id);
   if(!s) return;
-  document.getElementById('storyCatTag').textContent = cat.name;
+  document.getElementById('storyCatTag').textContent = (cat.type==='series' && s.epNum!=null) ? `${cat.name} · পর্ব ${toBengaliNum(s.epNum)}` : cat.name;
   document.getElementById('storyTitle').textContent = s.title;
-  document.getElementById('storyTopTitle').textContent = s.title;
+  document.getElementById('storyTopTitle').textContent = (cat.type==='series' && s.epNum!=null) ? `পর্ব ${toBengaliNum(s.epNum)}` : s.title;
   document.getElementById('storyMeta').textContent = `পড়ার সময় ${s.readtime}`;
 
   /* ── Split into ~200-word numbered sections ── */
@@ -1522,15 +1590,17 @@ function emojiPickerHtml(selected){
     EMOJI_LIST.map(e=>`<div onclick="pickedEmoji='${e}';document.querySelectorAll('.emoji-opt').forEach(x=>x.classList.remove('emoji-sel'));this.classList.add('emoji-sel')" class="emoji-opt ${e===selected?'emoji-sel':''}" style="width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;border:2px solid ${e===selected?'var(--gold)':'transparent'};background:var(--surface-shadow);">${e}</div>`).join('') +
   '</div>';
 }
-function openAddCategory(){
+let addCategoryIsSeries = false;
+function openAddCategory(isSeries){
+  addCategoryIsSeries = !!isSeries;
   pickedColor = PALETTE[0].hex;
-  pickedEmoji = '📚';
+  pickedEmoji = addCategoryIsSeries ? '📗' : '📚';
   openModal(`
-    <h3 class="modal-title">নতুন ক্যাটাগরি</h3>
-    <label class="field-label">ক্যাটাগরির নাম</label>
-    <input class="field-input" id="catNameInput" placeholder="যেমন: ভূতের গল্প">
+    <h3 class="modal-title">${addCategoryIsSeries ? 'নতুন সিরিজ' : 'নতুন ক্যাটাগরি'}</h3>
+    <label class="field-label">${addCategoryIsSeries ? 'সিরিজের নাম' : 'ক্যাটাগরির নাম'}</label>
+    <input class="field-input" id="catNameInput" placeholder="${addCategoryIsSeries ? 'যেমন: রহস্যের শহর' : 'যেমন: ভূতের গল্প'}">
     <label class="field-label">আইকন বেছে নিন</label>
-    ${emojiPickerHtml('📚')}
+    ${emojiPickerHtml(pickedEmoji)}
     <label class="field-label">রং বেছে নিন</label>
     ${colorRowHtml(pickedColor)}
     <div class="btn-row">
@@ -1542,11 +1612,13 @@ function openAddCategory(){
 async function saveNewCategory(){
   const name = document.getElementById('catNameInput').value.trim();
   if(!name){ showToast('নাম লিখুন'); return; }
-  DATA.categories.push({ id: uid(), name, color: pickedColor, emoji: pickedEmoji, stories: [] });
+  const newCat = { id: uid(), name, color: pickedColor, emoji: pickedEmoji, stories: [] };
+  if(addCategoryIsSeries) newCat.type = 'series';
+  DATA.categories.push(newCat);
   await saveData();
   closeModal();
   renderShelf();
-  showToast('ক্যাটাগরি যুক্ত হয়েছে');
+  showToast(addCategoryIsSeries ? 'সিরিজ যুক্ত হয়েছে' : 'ক্যাটাগরি যুক্ত হয়েছে');
 }
 function confirmDeleteCategory(){
   const cat = getCat();
@@ -1571,12 +1643,17 @@ async function deleteCategory(){
 }
 
 function openAddStory(){
+  const cat = getCat();
+  const isSeries = cat && cat.type === 'series';
+  const nextEp = isSeries ? (cat.stories.reduce((m,s)=>Math.max(m, s.epNum||0),0)+1) : '';
   openModal(`
-    <h3 class="modal-title">নতুন গল্প</h3>
+    <h3 class="modal-title">${isSeries ? 'নতুন পর্ব' : 'নতুন গল্প'}</h3>
+    ${isSeries ? `<label class="field-label">পর্ব নম্বর</label>
+    <input class="field-input" id="storyEpInput" type="number" min="1" value="${nextEp}" placeholder="যেমন: ১">` : `
     <label class="field-label">গল্পের টাইটেল</label>
-    <input class="field-input" id="storyTitleInput" placeholder="শিরোনাম লিখুন">
-    <label class="field-label">পুরো গল্প</label>
-    <textarea class="field-textarea" id="storyBodyInput" placeholder="এখানে গল্পটা লিখুন বা পেস্ট করুন…"></textarea>
+    <input class="field-input" id="storyTitleInput" placeholder="শিরোনাম লিখুন">`}
+    <label class="field-label">${isSeries ? 'পর্বের লেখা' : 'পুরো গল্প'}</label>
+    <textarea class="field-textarea" id="storyBodyInput" placeholder="এখানে লেখাটা লিখুন বা পেস্ট করুন…"></textarea>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
       <button class="btn btn-primary" onclick="saveNewStory()">যুক্ত করুন</button>
@@ -1588,25 +1665,41 @@ function estimateReadtime(text){
   return Math.max(1, Math.round(words/200)) + ' মিনিট';
 }
 async function saveNewStory(){
-  const title = document.getElementById('storyTitleInput').value.trim();
-  const body = document.getElementById('storyBodyInput').value.trim();
-  if(!title || !body){ showToast('টাইটেল ও গল্প দুটোই লিখুন'); return; }
   const cat = getCat();
-  cat.stories.push({ id: uid(), title, body, readtime: estimateReadtime(body) });
+  const isSeries = cat.type === 'series';
+  const titleInput = document.getElementById('storyTitleInput');
+  const body = document.getElementById('storyBodyInput').value.trim();
+  if(!isSeries){
+    const title = titleInput ? titleInput.value.trim() : '';
+    if(!title || !body){ showToast('টাইটেল ও লেখা দুটোই লিখুন'); return; }
+    cat.stories.push({ id: uid(), title, body, readtime: estimateReadtime(body) });
+  } else {
+    if(!body){ showToast('লেখা লিখুন'); return; }
+    const epInput = document.getElementById('storyEpInput');
+    const epNum = epInput ? parseInt(epInput.value) : NaN;
+    if(!epNum || epNum < 1){ showToast('পর্ব নম্বর লিখুন'); return; }
+    if(cat.stories.some(s=>s.epNum===epNum)){ showToast('এই পর্ব নম্বর আগে থেকেই আছে'); return; }
+    const newStory = { id: uid(), title: `পর্ব ${toBengaliNum(epNum)}`, body, readtime: estimateReadtime(body), epNum };
+    cat.stories.push(newStory);
+  }
   await saveData();
   closeModal();
   renderToc();
-  showToast('গল্প যুক্ত হয়েছে');
+  showToast(isSeries ? 'পর্ব যুক্ত হয়েছে' : 'গল্প যুক্ত হয়েছে');
 }
 
 function openEditStory(){
   const s = getStory();
   if(!s) return;
+  const cat = getCat();
+  const isSeries = cat && cat.type === 'series';
   openModal(`
-    <h3 class="modal-title">গল্প এডিট করুন</h3>
+    <h3 class="modal-title">${isSeries ? 'পর্ব এডিট করুন' : 'গল্প এডিট করুন'}</h3>
+    ${isSeries ? `<label class="field-label">পর্ব নম্বর</label>
+    <input class="field-input" id="storyEpInput" type="number" min="1" value="${s.epNum!=null?s.epNum:''}">` : `
     <label class="field-label">গল্পের টাইটেল</label>
-    <input class="field-input" id="storyTitleInput" value="${escapeAttr(s.title)}">
-    <label class="field-label">পুরো গল্প</label>
+    <input class="field-input" id="storyTitleInput" value="${escapeAttr(s.title)}">`}
+    <label class="field-label">${isSeries ? 'পর্বের লেখা' : 'পুরো গল্প'}</label>
     <textarea class="field-textarea" id="storyBodyInput">${escapeHtml(s.body)}</textarea>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
@@ -1615,15 +1708,28 @@ function openEditStory(){
   `);
 }
 async function saveEditStory(){
-  const title = document.getElementById('storyTitleInput').value.trim();
-  const body = document.getElementById('storyBodyInput').value.trim();
-  if(!title || !body){ showToast('টাইটেল ও গল্প দুটোই লিখুন'); return; }
   const s = getStory();
+  const cat = getCat();
+  const isSeries = cat && cat.type === 'series';
+  const body = document.getElementById('storyBodyInput').value.trim();
+  let title;
+  if(isSeries){
+    if(!body){ showToast('লেখা লিখুন'); return; }
+    const epInput = document.getElementById('storyEpInput');
+    const epNum = epInput ? parseInt(epInput.value) : NaN;
+    if(!epNum || epNum < 1){ showToast('পর্ব নম্বর লিখুন'); return; }
+    if(cat.stories.some(o=>o.id!==s.id && o.epNum===epNum)){ showToast('এই পর্ব নম্বর আগে থেকেই আছে'); return; }
+    s.epNum = epNum;
+    title = `পর্ব ${toBengaliNum(epNum)}`;
+  } else {
+    title = document.getElementById('storyTitleInput').value.trim();
+    if(!title || !body){ showToast('টাইটেল ও লেখা দুটোই লিখুন'); return; }
+  }
   s.title = title; s.body = body; s.readtime = estimateReadtime(body);
   await saveData();
   closeModal();
   renderStory(s.id, window.scrollY);
-  showToast('গল্প আপডেট হয়েছে');
+  showToast(isSeries ? 'পর্ব আপডেট হয়েছে' : 'গল্প আপডেট হয়েছে');
 }
 function confirmDeleteStory(){
   const s = getStory();
