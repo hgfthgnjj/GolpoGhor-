@@ -6,6 +6,8 @@
 <title>গল্পঘর</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Baloo+Da+2:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.maateen.me/kalpurush/font.css" rel="stylesheet">
+<link href="https://fonts.maateen.me/nikosh/font.css" rel="stylesheet">
 <link href="https://fonts.maateen.me/adorsho-lipi/font.css" rel="stylesheet">
 <style>
   :root{
@@ -99,6 +101,16 @@
   .toc-meta{font-size:13px;color:var(--slate);margin:0;}
   .toc-add{display:flex;align-items:center;gap:14px;padding:18px 0;margin-top:6px;cursor:pointer;color:var(--gold-deep);font-weight:600;}
   .toc-add:active{opacity:.6;}
+  /* গল্প যুক্ত করার ফ্লোটিং বাটন — স্ক্রল করলেও এক জায়গায় স্থির থাকবে */
+  .category-fab{
+    position:fixed;bottom:24px;right:20px;z-index:15;
+    width:56px;height:56px;border-radius:50%;border:none;
+    background:linear-gradient(135deg,var(--gold) 0%,var(--gold-deep) 100%);
+    color:#241608;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer;
+    transition:transform .15s ease;
+  }
+  .category-fab:active{transform:scale(.9);}
   .empty-state{margin-top:50px;text-align:center;color:var(--slate);padding:0 30px;}
   .empty-state .em-icon{font-size:30px;margin-bottom:10px;display:block;}
   .empty-state p{font-size:14px;line-height:1.7;margin:6px 0;}
@@ -204,6 +216,7 @@
   .reader-bg-green  { --reader-bg:#1e2d25; --reader-text:#ffffff; --reader-topbar:#172019; }
   .reader-bg-warm   { --reader-bg:#fdf6e3; --reader-text:#2e2210; --reader-topbar:#f0e8d0; }
   .reader-bg-grey   { --reader-bg:#2b2b2b; --reader-text:#ffffff; --reader-topbar:#222222; }
+  .reader-bg-mint   { --reader-bg:#eff9ee; --reader-text:#1f2e1c; --reader-topbar:#e1efdd; }
   /* apply theme to story view */
   .reader-themed #story            { background: var(--reader-bg) !important; }
   .reader-themed #storyTopbar      { background: var(--reader-topbar) !important; }
@@ -550,6 +563,9 @@
       <button class="icon-btn danger" id="deleteCatBtn" onclick="confirmDeleteCategory()">🗑</button>
     </div>
     <div class="toc-wrap" id="tocWrap"></div>
+    <button class="category-fab" id="categoryFab" onclick="openAddStory()" title="নতুন গল্প যুক্ত করুন">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
   </div>
 
   <div id="story" class="view hidden-view offscreen-right">
@@ -609,6 +625,7 @@
       <div class="bg-swatch selected" style="background:#1d2733;" data-theme="dark"    onclick="setReaderBg(this,'dark')"   title="ডার্ক নীল"></div>
       <div class="bg-swatch"          style="background:#f5efe6;" data-theme="sepia"   onclick="setReaderBg(this,'sepia')"  title="সেপিয়া"></div>
       <div class="bg-swatch"          style="background:#1e2d25;" data-theme="green"   onclick="setReaderBg(this,'green')"  title="ফরেস্ট গ্রিন"></div>
+      <div class="bg-swatch"          style="background:#eff9ee;" data-theme="mint"    onclick="setReaderBg(this,'mint')"   title="মিন্ট গ্রিন"></div>
       <div class="bg-swatch"          style="background:#2b2b2b;" data-theme="grey"    onclick="setReaderBg(this,'grey')"   title="চারকোল ধূসর"></div>
     </div>
   </div>
@@ -691,8 +708,11 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 // অফলাইন ক্যাশ চালু - অফলাইনে করা পরিবর্তন ফোনে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হবে
 db.enablePersistence({ synchronizeTabs: true }).catch(function(e){ console.log('persistence error', e); });
-// সব গল্প/ক্যাটাগরি একটাই ডকুমেন্টে রাখা হচ্ছে যাতে সব ডিভাইসে একই ডেটা দেখায়
-const CLOUD_DOC = db.collection('golpoghor').doc('library');
+// প্রতিটা গল্প এখন আলাদা ডকুমেন্টে জমা থাকে (Firestore-এর একটা ডকুমেন্টে ১ MB লিমিট আছে,
+// সব গল্প একসাথে একটাতে রাখলে বেশি গল্প যোগ করলে সেভ ফেইল করে)। 'library' ডকুমেন্টে শুধু
+// ক্যাটাগরির তথ্য আর কোন গল্প কোন ক্যাটাগরিতে আছে (storyIds) থাকে।
+const META_DOC = db.collection('golpoghor').doc('library');
+const STORIES_COL = META_DOC.collection('stories');
 </script>
 
 <script>
@@ -722,6 +742,73 @@ let scrollSaveTimer = null;
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
 /* ---------- STORAGE (লোকাল + ক্লাউড) ---------- */
+
+// meta ডকুমেন্ট (পুরনো বা নতুন যেকোনো ফরম্যাটে) + স্টোরি ডকুমেন্টগুলো থেকে পূর্ণ DATA অবজেক্ট বানানো
+function buildCloudDataFromMeta(metaRaw, storiesMap){
+  const categories = (metaRaw.categories || []).map(function(cm){
+    if(Array.isArray(cm.stories)){
+      // পুরনো ফরম্যাট: গল্পগুলো সরাসরি এখানেই ছিল (মাইগ্রেশনের আগ পর্যন্ত)
+      return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, stories: cm.stories };
+    }
+    const storyIds = cm.storyIds || [];
+    const stories = storyIds
+      .map(function(sid){ return storiesMap[sid]; })
+      .filter(Boolean)
+      .sort(function(a,b){ return (a.order||0)-(b.order||0); })
+      .map(function(s){ return { id: s.id, title: s.title, body: s.body, readtime: s.readtime }; });
+    return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, stories: stories };
+  });
+  return { categories: categories, favorites: metaRaw.favorites || [], lastRead: metaRaw.lastRead === undefined ? null : metaRaw.lastRead };
+}
+
+function countStories(d){
+  return (d.categories||[]).reduce(function(n,c){ return n + (c.stories ? c.stories.length : 0); }, 0);
+}
+
+// DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
+// এবং ডিলিট হওয়া গল্প থাকলে সেগুলোও ক্লাউড থেকে সরিয়ে দেওয়া
+async function pushAllToCloud(){
+  const metaData = {
+    categories: DATA.categories.map(function(c){
+      return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, storyIds: c.stories.map(function(s){ return s.id; }) };
+    }),
+    favorites: DATA.favorites,
+    lastRead: DATA.lastRead
+  };
+  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+  const currentIds = new Set();
+  const allStories = [];
+  DATA.categories.forEach(function(c){
+    c.stories.forEach(function(s, idx){
+      currentIds.add(s.id);
+      allStories.push({ id: s.id, catId: c.id, order: idx, title: s.title, body: s.body, readtime: s.readtime });
+    });
+  });
+
+  let staleIds = [];
+  try{
+    const existingSnap = await STORIES_COL.get();
+    existingSnap.forEach(function(d){ if(!currentIds.has(d.id)) staleIds.push(d.id); });
+  }catch(e){ console.log('stale story check failed', e); }
+
+  const ops = allStories.map(function(s){ return { type: 'set', s: s }; })
+    .concat(staleIds.map(function(id){ return { type: 'delete', id: id }; }));
+
+  for(let i=0; i<ops.length; i+=400){
+    const batch = db.batch();
+    ops.slice(i, i+400).forEach(function(op){
+      if(op.type==='set'){
+        const ref = STORIES_COL.doc(op.s.id);
+        batch.set(ref, { id: op.s.id, catId: op.s.catId, order: op.s.order, title: op.s.title, body: op.s.body, readtime: op.s.readtime, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      } else {
+        batch.delete(STORIES_COL.doc(op.id));
+      }
+    });
+    await batch.commit();
+  }
+}
+
 async function loadData(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -732,43 +819,75 @@ async function loadData(){
   if(DATA.lastRead === undefined) DATA.lastRead = null;
   renderShelf();
 
+  // প্রথমে একবার ক্লাউডের সাথে মিলিয়ে নেওয়া — পুরনো ফরম্যাটে ডেটা থাকলে নতুন ফরম্যাটে মাইগ্রেট করা হবে
   try{
-    CLOUD_DOC.onSnapshot(function(doc){
-      if(doc.exists){
-        const cloud = doc.data();
-        if(cloud && cloud.data){
-          const cloudData = cloud.data;
-          if(!cloudData.categories) cloudData.categories = [];
-          const localCount = DATA.categories.length;
-          const cloudCount = cloudData.categories.length;
+    const metaDoc = await META_DOC.get();
+    const storiesSnap = await STORIES_COL.get();
+    const storiesMap = {};
+    storiesSnap.forEach(function(d){ storiesMap[d.id] = d.data(); });
 
-          if(cloudCount >= localCount){
-            // ক্লাউডে বেশি বা সমান ডেটা আছে — ক্লাউডটাই নেওয়া হচ্ছে
-            DATA = cloudData;
-            if(!DATA.favorites) DATA.favorites = [];
-            if(DATA.lastRead === undefined) DATA.lastRead = null;
-            try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
-            renderShelf();
-          } else {
-            // লোকালে বেশি ডেটা আছে — লোকালটা ক্লাউডে পুশ করা হচ্ছে
-            console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
-            CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-              .catch(function(e){ console.log('merge push failed', e); });
-          }
-        }
+    if(metaDoc.exists && metaDoc.data() && metaDoc.data().data){
+      const metaRaw = metaDoc.data().data;
+      const cloudData = buildCloudDataFromMeta(metaRaw, storiesMap);
+      const localCount = countStories(DATA);
+      const cloudCount = countStories(cloudData);
+
+      if(cloudCount >= localCount){
+        DATA = cloudData;
+        if(!DATA.favorites) DATA.favorites = [];
+        if(DATA.lastRead === undefined) DATA.lastRead = null;
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+        renderShelf();
       } else {
-        // ক্লাউডে কিছু নেই — লোকাল ডেটা ক্লাউডে আপলোড
-        CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
-          .catch(function(e){ console.log('initial cloud push failed', e); });
+        console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
       }
-    }, function(err){ console.log('cloud sync error', err); });
+      // পুরনো ফরম্যাট (গল্প সরাসরি ক্যাটাগরির ভেতরে) হলে নতুন ফরম্যাটে মাইগ্রেট করে দেওয়া,
+      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা
+      const isLegacyFormat = (metaRaw.categories || []).some(function(cm){ return Array.isArray(cm.stories); });
+      if(isLegacyFormat || cloudCount < localCount){
+        pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
+      }
+    } else {
+      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড
+      pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
+    }
+  }catch(e){ console.log('initial cloud sync failed', e); }
+
+  // এরপর থেকে রিয়েল-টাইম লিসেনার — অন্য ডিভাইসে পরিবর্তন হলে অটো সিঙ্ক হবে
+  try{
+    let lastMeta = null, lastStories = null;
+    function applyIfCloudNewer(){
+      if(lastMeta === null || lastStories === null) return;
+      const cloudData = buildCloudDataFromMeta(lastMeta, lastStories);
+      const localCount = countStories(DATA);
+      const cloudCount = countStories(cloudData);
+      if(cloudCount >= localCount){
+        DATA = cloudData;
+        if(!DATA.favorites) DATA.favorites = [];
+        if(DATA.lastRead === undefined) DATA.lastRead = null;
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+        renderShelf();
+      }
+    }
+    META_DOC.onSnapshot(function(doc){
+      if(doc.exists && doc.data() && doc.data().data){
+        lastMeta = doc.data().data;
+        applyIfCloudNewer();
+      }
+    }, function(err){ console.log('meta sync error', err); });
+    STORIES_COL.onSnapshot(function(snap){
+      const m = {};
+      snap.forEach(function(d){ m[d.id] = d.data(); });
+      lastStories = m;
+      applyIfCloudNewer();
+    }, function(err){ console.log('stories sync error', err); });
   }catch(e){ console.log('cloud listener setup failed', e); }
 }
 async function saveData(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
   catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
   try{
-    await CLOUD_DOC.set({ data: DATA, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    await pushAllToCloud();
   }catch(e){
     // অফলাইনে থাকলে এই সেভটা Firestore-এর নিজের ক্যাশে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হয়ে যাবে
     console.log('cloud save queued (offline) or failed', e);
@@ -832,7 +951,7 @@ const READER_BG_KEY = 'golpoghor_reader_bg';
 function setReaderBg(el, theme){
   document.documentElement.classList.add('reader-themed');
   // remove all theme classes
-  ['dark','sepia','green','warm','grey'].forEach(t=>{
+  ['dark','sepia','green','warm','grey','mint'].forEach(t=>{
     document.documentElement.classList.remove('reader-bg-'+t);
   });
   document.documentElement.classList.add('reader-bg-'+theme);
@@ -846,7 +965,7 @@ function loadReaderBg(){
     const saved = localStorage.getItem(READER_BG_KEY);
     if(saved){
       document.documentElement.classList.add('reader-themed');
-      ['dark','sepia','green','warm','grey'].forEach(t=>{
+      ['dark','sepia','green','warm','grey','mint'].forEach(t=>{
         document.documentElement.classList.remove('reader-bg-'+t);
       });
       document.documentElement.classList.add('reader-bg-'+saved);
@@ -985,8 +1104,7 @@ function renderToc(){
       <p><b>এই বিভাগে এখনও কোনো গল্প নেই।</b></p>
       <p>নিচের বাটনে চাপ দিয়ে প্রথম গল্পটা যুক্ত করুন।</p>
     </div>`;
-  wrap.innerHTML = items + emptyMsg + `
-    <div class="toc-add" onclick="openAddStory()">＋ নতুন গল্প যুক্ত করুন</div>`;
+  wrap.innerHTML = items + emptyMsg;
   setTimeout(makeTocDraggable, 50);
 }
 
@@ -1296,6 +1414,8 @@ const FONTS = [
   {family:'Noto Serif Bengali', label:'নোটো সেরিফ বেঙ্গলি'},
   {family:'Baloo Da 2', label:'বালু দা'},
   {family:'Adorsho Lipi', label:'আদর্শ লিপি'},
+  {family:'Kalpurush', label:'কালপুরুষ'},
+  {family:'Nikosh', label:'নিকোশ'},
 ];
 function loadFontPref(){
   try{
