@@ -1103,9 +1103,10 @@ function renderTypeList(){
   const cats = DATA.categories.filter(c => currentHomeType ? c.type==='series' : c.type!=='series');
   shelf.classList.toggle('shelf-plain-list', !!currentHomeType);
   if(currentHomeType){
-    const rowsHtml = cats.map(cat => `
-      <div class="toc-item" onclick="openCategory('${cat.id}')">
-        <span class="toc-num" style="width:auto;">${cat.emoji || '📗'}</span>
+    const rowsHtml = cats.map((cat, idx) => `
+      <div class="toc-item" data-idx="${idx}" onclick="openCategory('${cat.id}')">
+        <span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>
+        <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
         <div class="toc-text">
           <p class="toc-title">${escapeHtml(cat.name)}</p>
           <p class="toc-meta">${cat.stories.length ? cat.stories.length + ' টি পর্ব' : 'এখনও কোনো পর্ব নেই'}</p>
@@ -1115,6 +1116,7 @@ function renderTypeList(){
       <div class="toc-add" onclick="openAddCategory(true)">
         <span>＋</span><span>নতুন সিরিজ</span>
       </div>`;
+    setTimeout(makeTypeListDraggable, 50);
     return;
   }
   const catsHtml = cats.map(cat => `
@@ -2472,6 +2474,31 @@ function makeTocDraggable(){
       const moved = cat.stories.splice(dragSrcIdx, 1)[0];
       cat.stories.splice(targetIdx, 0, moved);
       await saveData(); renderToc(); makeTocDraggable();
+    });
+  });
+}
+
+/* ── Drag Reorder (পর্ব গল্প ট্যাবের সিরিজ লিস্ট) ── */
+let dragSrcSeriesIdx = null;
+function makeTypeListDraggable(){
+  const wrap = document.getElementById('typeShelf');
+  if(!wrap) return;
+  const items = wrap.querySelectorAll('.toc-item[data-idx]');
+  items.forEach(item=>{
+    item.setAttribute('draggable','true');
+    item.addEventListener('dragstart', e=>{ dragSrcSeriesIdx = parseInt(item.dataset.idx); e.dataTransfer.effectAllowed='move'; });
+    item.addEventListener('dragover', e=>{ e.preventDefault(); item.classList.add('drag-over'); });
+    item.addEventListener('dragleave', ()=>item.classList.remove('drag-over'));
+    item.addEventListener('drop', async e=>{
+      e.preventDefault(); item.classList.remove('drag-over');
+      const targetIdx = parseInt(item.dataset.idx);
+      if(dragSrcSeriesIdx === null || dragSrcSeriesIdx === targetIdx) return;
+      const seriesCats = DATA.categories.filter(c=>c.type==='series');
+      const moved = seriesCats.splice(dragSrcSeriesIdx, 1)[0];
+      seriesCats.splice(targetIdx, 0, moved);
+      let si = 0;
+      DATA.categories = DATA.categories.map(c => c.type==='series' ? seriesCats[si++] : c);
+      await saveData(); renderTypeList();
     });
   });
 }
