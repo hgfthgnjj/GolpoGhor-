@@ -32,7 +32,7 @@
   @media (prefers-reduced-motion: reduce){.view{transition:none;}}
   .view.offscreen-right{transform:translateX(100%);}
   .view.offscreen-left{transform:translateX(-16%);opacity:0;}
-  .view.active{transform:translateX(0);opacity:1;}
+  .view.active{transform:none;opacity:1;}
   .hidden-view{display:none;}
 
   #home{background:var(--ink);padding-bottom:48px;}
@@ -63,9 +63,8 @@
 
   .shelf{padding:10px 16px 0;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .shelf.shelf-plain-list{display:block;padding:6px 22px 0;}
-  .shelf.shelf-plain-list .toc-item{padding:18px 0;border-bottom-color:rgba(255,255,255,.12);}
-  .shelf.shelf-plain-list .toc-title{color:var(--paper);}
-  .shelf.shelf-plain-list .toc-meta{color:#D9C4A8;}
+  .shelf.shelf-plain-list .toc-item{padding:18px 0;}
+  #typeList{background:var(--surface);min-height:100vh;}
   .spine{--c:var(--maroon);background:#fff;border-radius:16px;padding:18px 14px 16px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;cursor:pointer;border:1.5px solid #eee;position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07);transition:transform .15s,box-shadow .15s;text-align:center;}
   .spine:active{transform:scale(.96);box-shadow:0 1px 6px rgba(0,0,0,.1);}
   .spine-icon-wrap{width:64px;height:64px;border-radius:16px;background:rgba(198,138,69,.18);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:12px;flex-shrink:0;}
@@ -575,6 +574,9 @@
       <button class="dark-toggle-btn" onclick="toggleDarkMode()" title="ডার্ক মোড">🌙</button>
     </div>
     <div class="shelf" id="typeShelf" style="padding:14px 16px 40px;"></div>
+    <button class="category-fab" id="typeListFab" onclick="openSeriesAddMenu()" title="যুক্ত করুন" style="display:none;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
   </div>
 
   <div id="category" class="view hidden-view offscreen-right">
@@ -634,6 +636,7 @@
   </div>
 </div>
 
+<input type="file" id="epubFileInput" accept=".epub" style="display:none" onchange="handleEpubFile(event)">
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
   <div class="modal-card" id="modalCard"></div>
 </div>
@@ -715,6 +718,7 @@
 <div class="toast" id="toast"></div>
 
 <!-- ===== Firebase (ক্লাউড স্টোরেজ + অফলাইন সিঙ্ক) ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
@@ -1112,11 +1116,15 @@ function renderTypeList(){
           <p class="toc-meta">${cat.stories.length ? cat.stories.length + ' টি পর্ব' : 'এখনও কোনো পর্ব নেই'}</p>
         </div>
       </div>`).join('');
-    shelf.innerHTML = rowsHtml + `
-      <div class="toc-add" onclick="openAddCategory(true)">
-        <span>＋</span><span>নতুন সিরিজ</span>
+    shelf.innerHTML = rowsHtml || `
+      <div class="empty-state">
+        <span class="em-icon">📗</span>
+        <p><b>এখনও কোনো ধারাবাহিক গল্প/সিরিজ নেই।</b></p>
+        <p>নিচের ＋ বাটনে চাপ দিয়ে প্রথমটা যুক্ত করুন।</p>
       </div>`;
     setTimeout(makeTypeListDraggable, 50);
+    const typeFab = document.getElementById('typeListFab');
+    if(typeFab) typeFab.style.display = '';
     return;
   }
   const catsHtml = cats.map(cat => `
@@ -1130,6 +1138,8 @@ function renderTypeList(){
       <div class="spine-icon-wrap">＋</div>
       <span class="spine-name">নতুন ক্যাটাগরি</span>
     </div>`;
+  const typeFab2 = document.getElementById('typeListFab');
+  if(typeFab2) typeFab2.style.display = 'none';
 }
 
 /* ---------- CATEGORY / TOC ---------- */
@@ -2501,6 +2511,122 @@ function makeTypeListDraggable(){
       await saveData(); renderTypeList();
     });
   });
+}
+
+/* ── পর্ব গল্প ট্যাবের FAB — নতুন সিরিজ / EPUB আপলোড বাছাইয়ের মেনু ── */
+function openSeriesAddMenu(){
+  openModal(`
+    <h3 class="modal-title">কী যোগ করতে চান?</h3>
+    <div class="btn-row" style="flex-direction:column;gap:12px;">
+      <button class="btn btn-primary" style="width:100%;" onclick="closeModal();openAddCategory(true)">＋ নতুন সিরিজ</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerEpubUpload()">📕 EPUB থেকে বই যোগ করুন</button>
+    </div>
+  `);
+}
+
+/* ── EPUB আপলোড (বইকে সিরিজ/পর্ব হিসেবে যোগ করা) ── */
+function triggerEpubUpload(){
+  if(typeof JSZip === 'undefined'){ showToast('EPUB টুল লোড হয়নি, ইন্টারনেট চেক করে আবার চেষ্টা করুন'); return; }
+  const inp = document.getElementById('epubFileInput');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+function getOpfTitle(opfDoc){
+  let els = opfDoc.getElementsByTagName('dc:title');
+  if(els.length && els[0].textContent.trim()) return els[0].textContent.trim();
+  try{
+    els = opfDoc.getElementsByTagNameNS('http://purl.org/dc/elements/1.1/', 'title');
+    if(els.length && els[0].textContent.trim()) return els[0].textContent.trim();
+  }catch(e){}
+  return '';
+}
+
+function extractTextFromHtml(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, style').forEach(el=>el.remove());
+  let text = '';
+  if(doc.body){
+    doc.body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote').forEach(el=>{
+      const t = el.textContent.replace(/[ \t]+/g,' ').trim();
+      if(t) text += t + '\n\n';
+    });
+    if(!text.trim()){
+      text = doc.body.textContent.replace(/[ \t]+/g,' ').trim();
+    }
+  }
+  return text.trim();
+}
+
+async function parseEpub(zip){
+  const containerFile = zip.file('META-INF/container.xml');
+  if(!containerFile) throw new Error('অবৈধ EPUB (container.xml পাওয়া যায়নি)');
+  const containerXml = await containerFile.async('text');
+  const containerDoc = new DOMParser().parseFromString(containerXml, 'application/xml');
+  const rootfile = containerDoc.querySelector('rootfile');
+  const opfPath = rootfile ? rootfile.getAttribute('full-path') : null;
+  if(!opfPath) throw new Error('EPUB-এর ভেতরের বই খুঁজে পাওয়া যায়নি');
+  const opfDir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/')+1) : '';
+  const opfFile = zip.file(opfPath);
+  if(!opfFile) throw new Error('EPUB-এর কনটেন্ট ফাইল পাওয়া যায়নি');
+  const opfXml = await opfFile.async('text');
+  const opfDoc = new DOMParser().parseFromString(opfXml, 'application/xml');
+
+  const title = getOpfTitle(opfDoc);
+
+  const manifestItems = {};
+  opfDoc.querySelectorAll('manifest > item').forEach(item=>{
+    manifestItems[item.getAttribute('id')] = item.getAttribute('href');
+  });
+
+  const spineIds = [];
+  opfDoc.querySelectorAll('spine > itemref').forEach(ir=>{
+    if(ir.getAttribute('linear') !== 'no') spineIds.push(ir.getAttribute('idref'));
+  });
+
+  const chapters = [];
+  for(const id of spineIds){
+    const href = manifestItems[id];
+    if(!href) continue;
+    let fullPath = (opfDir + decodeURIComponent(href)).replace(/\\/g,'/');
+    fullPath = fullPath.split('/').reduce((parts, seg)=>{
+      if(seg==='..') parts.pop(); else if(seg!=='.') parts.push(seg);
+      return parts;
+    }, []).join('/');
+    const chFile = zip.file(fullPath);
+    if(!chFile) continue;
+    const html = await chFile.async('text');
+    const text = extractTextFromHtml(html);
+    if(text && text.length > 60) chapters.push(text);
+  }
+  return { title, chapters };
+}
+
+async function handleEpubFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!/\.epub$/i.test(file.name)){ showToast('একটা .epub ফাইল বাছাই করুন'); return; }
+  showToast('EPUB পড়া হচ্ছে, একটু অপেক্ষা করুন…');
+  try{
+    const zip = await JSZip.loadAsync(file);
+    const parsed = await parseEpub(zip);
+    if(!parsed.chapters.length){ showToast('বইয়ের ভেতরে পড়ার মতো কোনো লেখা পাওয়া যায়নি (এটা DRM-সুরক্ষিত হতে পারে)'); return; }
+    const bookTitle = parsed.title || file.name.replace(/\.epub$/i,'');
+    const newCat = { id: uid(), name: bookTitle, color: PALETTE[Math.floor(Math.random()*PALETTE.length)].hex, emoji: '📕', type: 'series', stories: [] };
+    parsed.chapters.forEach((ch, idx)=>{
+      newCat.stories.push({ id: uid(), title: `পর্ব ${toBengaliNum(idx+1)}`, body: ch, readtime: estimateReadtime(ch), epNum: idx+1 });
+    });
+    DATA.categories.push(newCat);
+    await saveData();
+    showToast(`"${bookTitle}" যোগ হয়েছে (${parsed.chapters.length} টি পর্ব)`);
+    currentHomeType = true;
+    renderTypeList();
+    renderShelf();
+  }catch(err){
+    console.log('epub parse error', err);
+    showToast('EPUB ফাইলটা পড়া যায়নি। ফাইলটা ক্ষতিগ্রস্ত বা DRM-সুরক্ষিত হতে পারে।');
+  }
 }
 
 /* ---------- INIT ---------- */
