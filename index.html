@@ -1226,6 +1226,7 @@ function openEditCategory(){
   if(!cat) return;
   pickedColor = cat.color;
   pickedEmoji = cat.emoji || '📚';
+  const isSeries = cat.type === 'series';
   openModal(`
     <h3 class="modal-title">ক্যাটাগরি এডিট করুন</h3>
     <label class="field-label">ক্যাটাগরির নাম</label>
@@ -1234,6 +1235,10 @@ function openEditCategory(){
     ${emojiPickerHtml(cat.emoji || '📚')}
     <label class="field-label">রং বেছে নিন</label>
     ${colorRowHtml(pickedColor)}
+    <label class="field-label" style="display:flex;align-items:center;gap:10px;margin-top:14px;cursor:pointer;" onclick="const cb=document.getElementById('editCatIsSeries'); cb.checked=!cb.checked;">
+      <input type="checkbox" id="editCatIsSeries" ${isSeries?'checked':''} style="width:18px;height:18px;margin:0;">
+      <span>এটা কি সিরিজ/পর্ব ক্যাটাগরি?</span>
+    </label>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
       <button class="btn btn-primary" onclick="saveEditCategory()">সেভ করুন</button>
@@ -1245,6 +1250,11 @@ async function saveEditCategory(){
   if(!name){ showToast('নাম লিখুন'); return; }
   const cat = getCat();
   cat.name = name; cat.color = pickedColor; cat.emoji = pickedEmoji;
+  const seriesCb = document.getElementById('editCatIsSeries');
+  if(seriesCb){
+    if(seriesCb.checked) cat.type = 'series';
+    else delete cat.type;
+  }
   await saveData();
   closeModal();
   renderToc();
