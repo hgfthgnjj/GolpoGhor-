@@ -772,15 +772,15 @@ function buildCloudDataFromMeta(metaRaw, storiesMap){
   const categories = (metaRaw.categories || []).map(function(cm){
     if(Array.isArray(cm.stories)){
       // পুরনো ফরম্যাট: গল্পগুলো সরাসরি এখানেই ছিল (মাইগ্রেশনের আগ পর্যন্ত)
-      return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, stories: cm.stories };
+      return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, type: cm.type, stories: cm.stories };
     }
     const storyIds = cm.storyIds || [];
     const stories = storyIds
       .map(function(sid){ return storiesMap[sid]; })
       .filter(Boolean)
       .sort(function(a,b){ return (a.order||0)-(b.order||0); })
-      .map(function(s){ return { id: s.id, title: s.title, body: s.body, readtime: s.readtime }; });
-    return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, stories: stories };
+      .map(function(s){ return { id: s.id, title: s.title, body: s.body, readtime: s.readtime, epNum: s.epNum }; });
+    return { id: cm.id, name: cm.name, color: cm.color, emoji: cm.emoji, type: cm.type, stories: stories };
   });
   return { categories: categories, favorites: metaRaw.favorites || [], lastRead: metaRaw.lastRead === undefined ? null : metaRaw.lastRead, version: metaRaw.version || 0 };
 }
@@ -794,7 +794,7 @@ function countStories(d){
 async function pushAllToCloud(){
   const metaData = {
     categories: DATA.categories.map(function(c){
-      return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, storyIds: c.stories.map(function(s){ return s.id; }) };
+      return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type, storyIds: c.stories.map(function(s){ return s.id; }) };
     }),
     favorites: DATA.favorites,
     lastRead: DATA.lastRead,
@@ -807,7 +807,7 @@ async function pushAllToCloud(){
   DATA.categories.forEach(function(c){
     c.stories.forEach(function(s, idx){
       currentIds.add(s.id);
-      allStories.push({ id: s.id, catId: c.id, order: idx, title: s.title, body: s.body, readtime: s.readtime });
+      allStories.push({ id: s.id, catId: c.id, order: idx, title: s.title, body: s.body, readtime: s.readtime, epNum: (s.epNum!=null?s.epNum:null) });
     });
   });
 
@@ -825,7 +825,7 @@ async function pushAllToCloud(){
     ops.slice(i, i+400).forEach(function(op){
       if(op.type==='set'){
         const ref = STORIES_COL.doc(op.s.id);
-        batch.set(ref, { id: op.s.id, catId: op.s.catId, order: op.s.order, title: op.s.title, body: op.s.body, readtime: op.s.readtime, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        batch.set(ref, { id: op.s.id, catId: op.s.catId, order: op.s.order, title: op.s.title, body: op.s.body, readtime: op.s.readtime, epNum: op.s.epNum, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
       } else {
         batch.delete(STORIES_COL.doc(op.id));
       }
