@@ -320,6 +320,17 @@
   /* ── Drag reorder ── */
   .toc-item.drag-over{border-top:2px solid var(--gold);}
   .drag-handle{font-size:16px;color:var(--slate);cursor:grab;padding:0 6px;flex-shrink:0;touch-action:none;}
+  .ep-read-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;margin-top:5px;transition:background .2s;}
+  #nextEpWrap{padding:0 24px 70px;}
+  .ep-nav-row{display:flex;gap:12px;}
+  .next-ep-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;
+    background:linear-gradient(135deg,var(--gold) 0%,var(--gold-deep) 100%);color:#241608;border:none;
+    border-radius:14px;padding:16px 14px;font-family:'Hind Siliguri',sans-serif;font-size:14.5px;font-weight:700;
+    cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.18);}
+  .next-ep-btn:active{transform:scale(.98);}
+  .ep-nav-disabled{background:var(--surface-shadow);color:var(--slate);box-shadow:none;cursor:default;font-weight:600;}
+  .ep-nav-disabled:active{transform:none;}
+  .next-ep-end{text-align:center;padding:18px 10px;color:var(--slate);font-size:14px;font-family:'Hind Siliguri',sans-serif;letter-spacing:.03em;}
   .drag-handle:active{cursor:grabbing;}
 
   /* ── Para TOC Modal ── */
@@ -623,6 +634,7 @@
       <span class="story-meta" id="storyMeta"></span>
     </div>
     <div class="story-body" id="storyBody" onclick="handleStoryTap()" oncontextmenu="return false" oncopy="return false"></div>
+    <div id="nextEpWrap"></div>
 
     <!-- floating menu button -->
     <button class="floating-menu-btn" id="floatingMenuBtn" onclick="openReaderDrawer()">
@@ -976,6 +988,7 @@ function showTopbarFromFloat(){
 function openReaderDrawer(){
   document.getElementById('readerDrawer').classList.add('open');
   document.getElementById('drawerOverlay').classList.add('open');
+  pushOverlay(closeReaderDrawer);
   updateWishlistDrawerBtn();
   try{
     const saved = localStorage.getItem(FONTSIZE_KEY);
@@ -986,9 +999,10 @@ function openReaderDrawer(){
     if(disp) disp.textContent = toBengaliNum(size) + 'px';
   }catch(e){}
 }
-function closeReaderDrawer(){
+function closeReaderDrawer(fromPopstate){
   document.getElementById('readerDrawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
+  if(!fromPopstate) popOverlayHistory(closeReaderDrawer);
 }
 
 /* ── Reader background theme ── */
@@ -1049,6 +1063,20 @@ function setView(id, direction){
 /* ---------- HISTORY / BACK BUTTON HANDLING ---------- */
 function safeHistory(fn){ try{ fn(); }catch(e){ /* history API unavailable in this environment, ignore */ } }
 
+/* ── Overlay/Modal/Drawer Back-Button Stack ──
+   মডাল, ড্রয়ার বা অন্য কোনো ওভারলে খোলা থাকলে ফোনের ব্যাক বাটনে চাপ দিলে
+   যেন প্রথমে সেটাই বন্ধ হয় (পুরো পেজ/অ্যাপ থেকে বের না হয়ে যায়) */
+let overlayStack = [];
+function pushOverlay(closeFn){
+  overlayStack.push(closeFn);
+  safeHistory(()=>history.pushState({overlay:true}, '', location.hash));
+}
+function popOverlayHistory(closeFn){
+  // ইউজার নিজে (X/বাতিল/ব্যাকড্রপ ক্লিক করে) ওভারলে বন্ধ করলে, হিস্ট্রিতে যোগ করা এন্ট্রিটাও সরিয়ে দেওয়া হয়
+  const idx = overlayStack.lastIndexOf(closeFn);
+  if(idx !== -1){ overlayStack.splice(idx,1); safeHistory(()=>history.back()); }
+}
+
 function goBackInApp(){
   
   const activeEl = document.querySelector('.view.active');
@@ -1080,7 +1108,14 @@ function goBackInApp(){
   }
 }
 
-window.addEventListener('popstate', ()=>{ goBackInApp(); });
+window.addEventListener('popstate', ()=>{
+  if(overlayStack.length){
+    const closeFn = overlayStack.pop();
+    try{ closeFn(true); }catch(e){}
+    return;
+  }
+  goBackInApp();
+});
 
 /* ---------- HOME / SHELF ---------- */
 function renderShelf(){
@@ -1177,8 +1212,9 @@ function renderToc(){
     if(isSeries){
       const epLabel = `পর্ব ${toBengaliNum(s.epNum!=null ? s.epNum : (idx+1))}`;
       return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
+        <span class="ep-read-dot" style="${read ? 'background:#3FAE58;box-shadow:0 0 0 3px rgba(63,174,88,.22);' : 'background:transparent;box-shadow:inset 0 0 0 1.5px var(--surface-shadow);'}"></span>
         <div class="toc-text">
-          <p class="toc-title">${epLabel}${read?'<span class=\'read-badge\'>✓ পড়া</span>':''}</p>
+          <p class="toc-title">${epLabel}${read?'<span class=\'read-badge\' style=\'background:#3FAE58;color:#fff;\'>✓ পড়া হয়েছে</span>':''}</p>
           <p class="toc-meta">পড়ার সময় ${s.readtime} · ${getWordCount(s.body).toLocaleString('bn')} শব্দ</p>
         </div>
       </div>`;
@@ -1187,8 +1223,9 @@ function renderToc(){
     return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
       <span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>
       <span class="toc-num">${numLabel}</span>
+      <span class="ep-read-dot" style="${read ? 'background:#3FAE58;box-shadow:0 0 0 3px rgba(63,174,88,.22);' : 'background:transparent;box-shadow:inset 0 0 0 1.5px var(--surface-shadow);'}"></span>
       <div class="toc-text">
-        <p class="toc-title">${escapeHtml(s.title)}${read?'<span class=\'read-badge\'>✓ পড়া</span>':''}</p>
+        <p class="toc-title">${escapeHtml(s.title)}${read?'<span class=\'read-badge\' style=\'background:#3FAE58;color:#fff;\'>✓ পড়া হয়েছে</span>':''}</p>
         <p class="toc-meta">পড়ার সময় ${s.readtime} · ${getWordCount(s.body).toLocaleString('bn')} শব্দ</p>
       </div>
     </div>`;
@@ -1354,6 +1391,35 @@ function renderStory(id, scrollTo){
   }).join('');
 
   document.getElementById('storyBody').innerHTML = html;
+
+  /* ── সিরিজ হলে লেখার শেষে "পরবর্তী পর্ব" বাটন / "শেষ পর্ব" বার্তা যোগ করা ── */
+  const nextEpWrap = document.getElementById('nextEpWrap');
+  if(nextEpWrap){
+    if(cat.type === 'series'){
+      const orderedEps = cat.stories.slice().sort((a,b)=>(a.epNum||0)-(b.epNum||0));
+      const curIdx = orderedEps.findIndex(x=>x.id===s.id);
+      const prevEp = (curIdx > 0) ? orderedEps[curIdx-1] : null;
+      const nextEp = (curIdx !== -1 && curIdx < orderedEps.length-1) ? orderedEps[curIdx+1] : null;
+      const prevBtnHtml = prevEp
+        ? `<button class="next-ep-btn ep-nav-btn ep-nav-prev" onclick="openStory('${prevEp.id}')">
+            <span aria-hidden="true">←</span>
+            <span>পর্ব ${toBengaliNum(prevEp.epNum!=null?prevEp.epNum:curIdx)}</span>
+          </button>`
+        : `<div class="next-ep-btn ep-nav-btn ep-nav-disabled"><span aria-hidden="true">←</span><span>প্রথম পর্ব</span></div>`;
+      const nextBtnHtml = nextEp
+        ? `<button class="next-ep-btn ep-nav-btn ep-nav-next" onclick="markAsRead('${cat.id}','${s.id}');openStory('${nextEp.id}')">
+            <span>পর্ব ${toBengaliNum(nextEp.epNum!=null?nextEp.epNum:(curIdx+2))}</span>
+            <span aria-hidden="true">→</span>
+          </button>`
+        : `<div class="next-ep-btn ep-nav-btn ep-nav-disabled"><span>সর্বশেষ পর্ব</span></div>`;
+      nextEpWrap.innerHTML = `<div class="ep-nav-row">${prevBtnHtml}${nextBtnHtml}</div>`;
+      if(!nextEp){
+        nextEpWrap.innerHTML += `<div class="next-ep-end">— এই সিরিজের সর্বশেষ পর্ব —</div>`;
+      }
+    } else {
+      nextEpWrap.innerHTML = '';
+    }
+  }
 
   /* show/hide floating bookmark jump button */
   updateBookmarkIndicator(id);
@@ -1607,9 +1673,15 @@ function updateFavBtn(){
 /* ---------- MODALS ---------- */
 function openModal(html){
   document.getElementById('modalCard').innerHTML = html;
-  document.getElementById('modalOverlay').classList.add('open');
+  const overlay = document.getElementById('modalOverlay');
+  const alreadyOpen = overlay.classList.contains('open');
+  overlay.classList.add('open');
+  if(!alreadyOpen) pushOverlay(closeModal);
 }
-function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal(fromPopstate){
+  document.getElementById('modalOverlay').classList.remove('open');
+  if(!fromPopstate) popOverlayHistory(closeModal);
+}
 
 function colorRowHtml(selected){
   return `<div class="color-row">${PALETTE.map(c=>`
@@ -1687,7 +1759,7 @@ function openShortStoryAddMenu(){
   openModal(`
     <h3 class="modal-title">কী যোগ করতে চান?</h3>
     <div class="btn-row" style="flex-direction:column;gap:12px;">
-      <button class="btn btn-primary" style="width:100%;" onclick="closeModal();openAddStory()">＋ নতুন গল্প</button>
+      <button class="btn btn-primary" style="width:100%;" onclick="openAddStory()">＋ নতুন গল্প</button>
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerDocxUpload()">📄 Word (.docx) থেকে টাইটেল অনুযায়ী গল্প যোগ করুন</button>
     </div>
   `);
@@ -1918,11 +1990,13 @@ function openLastReadFromHeader(){
 function openHomeMenu(){
   document.getElementById('homeDrawer').classList.add('open');
   document.getElementById('homeDrawerOverlay').classList.add('open');
+  pushOverlay(closeHomeMenu);
   syncPinToggleUI();
 }
-function closeHomeMenu(){
+function closeHomeMenu(fromPopstate){
   document.getElementById('homeDrawer').classList.remove('open');
   document.getElementById('homeDrawerOverlay').classList.remove('open');
+  if(!fromPopstate) popOverlayHistory(closeHomeMenu);
 }
 function syncPinToggleUI(){
   const hasPin = !!localStorage.getItem(PIN_KEY);
@@ -2319,14 +2393,15 @@ let searchCurrent = 0;
 let originalBodyHTML = '';
 function openStorySearch(){
   const bar = document.getElementById('storySearchBar');
-  if(bar){ bar.classList.add('open'); document.getElementById('storySearchInput').focus(); }
+  if(bar){ bar.classList.add('open'); document.getElementById('storySearchInput').focus(); pushOverlay(closeStorySearch); }
 }
-function closeStorySearch(){
+function closeStorySearch(fromPopstate){
   const bar = document.getElementById('storySearchBar');
   if(bar) bar.classList.remove('open');
   clearSearchHighlights();
   document.getElementById('storySearchInput').value = '';
   document.getElementById('searchCount').textContent = '';
+  if(!fromPopstate) popOverlayHistory(closeStorySearch);
 }
 function clearSearchHighlights(){
   const body = document.getElementById('storyBody');
@@ -2421,9 +2496,11 @@ function openParaToc(){
     }).join('');
   }
   document.getElementById('paraTocOverlay').classList.add('open');
+  pushOverlay(closeParaToc);
 }
-function closeParaToc(){
+function closeParaToc(fromPopstate){
   document.getElementById('paraTocOverlay').classList.remove('open');
+  if(!fromPopstate) popOverlayHistory(closeParaToc);
 }
 function jumpToParaSection(idx){
   closeParaToc();
@@ -2477,8 +2554,9 @@ function renderAllStoriesToc(){
     const read = readSet.has(cat.id+'::'+s.id);
     return `<div class="toc-item" onclick="currentCatId='${cat.id}';openStory('${s.id}')">
       <span class="toc-num">${String(idx+1).padStart(2,'0')}</span>
+      <span class="ep-read-dot" style="${read ? 'background:#3FAE58;box-shadow:0 0 0 3px rgba(63,174,88,.22);' : 'background:transparent;box-shadow:inset 0 0 0 1.5px var(--surface-shadow);'}"></span>
       <div class="toc-text">
-        <p class="toc-title">${escapeHtml(s.title)}${read?'<span class=\'read-badge\'>✓ পড়া</span>':''}</p>
+        <p class="toc-title">${escapeHtml(s.title)}${read?'<span class=\'read-badge\' style=\'background:#3FAE58;color:#fff;\'>✓ পড়া হয়েছে</span>':''}</p>
         <p class="toc-meta">${escapeHtml(cat.name)} · ${s.readtime}</p>
       </div>
     </div>`;
@@ -2538,7 +2616,7 @@ function openSeriesAddMenu(){
   openModal(`
     <h3 class="modal-title">কী যোগ করতে চান?</h3>
     <div class="btn-row" style="flex-direction:column;gap:12px;">
-      <button class="btn btn-primary" style="width:100%;" onclick="closeModal();openAddCategory(true)">＋ নতুন সিরিজ</button>
+      <button class="btn btn-primary" style="width:100%;" onclick="openAddCategory(true)">＋ নতুন সিরিজ</button>
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerEpubUpload()">📕 EPUB থেকে বই যোগ করুন</button>
     </div>
   `);
