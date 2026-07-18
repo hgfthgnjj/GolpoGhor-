@@ -681,7 +681,7 @@
 
 <input type="file" id="epubFileInput" accept=".epub" style="display:none" onchange="handleEpubFile(event)">
 <input type="file" id="docxFileInput" accept=".docx" style="display:none" onchange="handleDocxFile(event)">
-<input type="file" id="bloggerXmlFileInput" accept=".xml" style="display:none" onchange="handleBloggerXmlFile(event)">
+<input type="file" id="bloggerFileInput" accept=".xml" style="display:none" onchange="handleBloggerFile(event)">
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
   <div class="modal-card" id="modalCard"></div>
 </div>
@@ -844,7 +844,7 @@ function countStories(d){
 
 // DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
 // এবং ডিলিট হওয়া গল্প থাকলে সেগুলোও ক্লাউড থেকে সরিয়ে দেওয়া
-async function pushAllToCloud(){
+async function pushAllToCloud(changedIds, deletedIds){
   const metaData = {
     categories: DATA.categories.map(function(c){
       return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null, storyIds: c.stories.map(function(s){ return s.id; }) };
@@ -855,6 +855,39 @@ async function pushAllToCloud(){
   };
   await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
+  // দ্রুত পথ: শুধু যে গল্পগুলো আসলে যোগ/এডিট/ডিলিট হয়েছে সেগুলোই লেখা হয় —
+  // পুরো লাইব্রেরি আবার স্ক্যান/রি-রাইট করার দরকার হয় না। একটা গল্প যোগ করলে
+  // লাইব্রেরিতে যতই গল্প থাকুক, সেভ সবসময় একই রকম দ্রুত হবে।
+  if(changedIds !== undefined){
+    const allStoriesById = {};
+    DATA.categories.forEach(function(c){
+      c.stories.forEach(function(s, idx){ allStoriesById[s.id] = { s, catId: c.id, idx }; });
+    });
+    const ops = [];
+    (changedIds || []).forEach(function(id){
+      const found = allStoriesById[id];
+      if(found) ops.push({ type:'set', s: found.s, catId: found.catId, order: found.idx });
+    });
+    (deletedIds || []).forEach(function(id){ ops.push({ type:'delete', id }); });
+
+    for(let i=0; i<ops.length; i+=400){
+      const batch = db.batch();
+      ops.slice(i, i+400).forEach(function(op){
+        if(op.type==='set'){
+          const ref = STORIES_COL.doc(op.s.id);
+          batch.set(ref, { id: op.s.id, catId: op.catId, order: op.order, title: op.s.title, body: op.s.body, readtime: op.s.readtime, epNum: (op.s.epNum!=null?op.s.epNum:null), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        } else {
+          batch.delete(STORIES_COL.doc(op.id));
+        }
+      });
+      await batch.commit();
+    }
+    return;
+  }
+
+  // ধীর/সম্পূর্ণ পথ: ঠিক কোন গল্প বদলেছে তা নিশ্চিত না থাকলে (যেমন: প্রথমবার সিঙ্ক, মাইগ্রেশন,
+  // বাল্ক অপারেশন) পুরো লাইব্রেরি আবার লেখা হয়, আর ক্লাউডে কোনো "স্টেল" (মুছে ফেলা) গল্প
+  // থেকে গেলে সেটাও খুঁজে বের করে সরানো হয়
   const currentIds = new Set();
   const allStories = [];
   DATA.categories.forEach(function(c){
@@ -969,12 +1002,12 @@ async function loadData(){
     }, function(err){ console.log('stories sync error', err); });
   }catch(e){ console.log('cloud listener setup failed', e); }
 }
-async function saveData(){
+async function saveData(changedIds, deletedIds){
   DATA.version = (DATA.version || 0) + 1;
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
   catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
   try{
-    await pushAllToCloud();
+    await pushAllToCloud(changedIds, deletedIds);
   }catch(e){
     // অফলাইনে থাকলে এই সেভটা Firestore-এর নিজের ক্যাশে জমা থাকবে, অনলাইন হলে অটো সিঙ্ক হয়ে যাবে
     console.log('cloud save queued (offline) or failed', e);
@@ -1485,7 +1518,7 @@ async function saveEditCategory(){
     if(seriesCb.checked) cat.type = 'series';
     else delete cat.type;
   }
-  await saveData();
+  await saveData([]);
   closeModal();
   renderToc();
   showToast('ক্যাটাগরি আপডেট হয়েছে');
@@ -1898,7 +1931,7 @@ async function saveNewCategory(){
   const newCat = { id: uid(), name, color: pickedColor, emoji: pickedEmoji, stories: [] };
   if(addCategoryIsSeries) newCat.type = 'series';
   DATA.categories.push(newCat);
-  await saveData();
+  await saveData([]);
   closeModal();
   renderShelf();
   showToast(addCategoryIsSeries ? 'সিরিজ যুক্ত হয়েছে' : 'ক্যাটাগরি যুক্ত হয়েছে');
@@ -1916,10 +1949,12 @@ function confirmDeleteCategory(){
   `);
 }
 async function deleteCategory(){
+  const cat = getCat();
+  const deletedStoryIds = cat ? cat.stories.map(s=>s.id) : [];
   DATA.favorites = DATA.favorites.filter(f=>f.catId!==currentCatId);
   if(DATA.lastRead && DATA.lastRead.catId===currentCatId) DATA.lastRead = null;
   DATA.categories = DATA.categories.filter(c=>c.id!==currentCatId);
-  await saveData();
+  await saveData([], deletedStoryIds);
   closeModal();
   showToast('ক্যাটাগরি ডিলিট হয়েছে');
   goBackInApp();
@@ -1938,7 +1973,7 @@ function openShortStoryAddMenu(){
     <div class="btn-row" style="flex-direction:column;gap:12px;">
       <button class="btn btn-primary" style="width:100%;" onclick="openAddStory()">＋ নতুন গল্প</button>
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerDocxUpload()">📄 Word (.docx) থেকে টাইটেল অনুযায়ী গল্প যোগ করুন</button>
-      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerBloggerXmlUpload()">🌐 Blogger XML ফাইল থেকে সব গল্প যোগ করুন</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerBloggerUpload()">🌐 Blogger এক্সপোর্ট (.xml) থেকে সব পোস্ট যোগ করুন</button>
     </div>
   `);
 }
@@ -1975,6 +2010,7 @@ async function saveNewStory(){
     const title = titleInput ? titleInput.value.trim() : '';
     if(!title || !body){ showToast('টাইটেল ও লেখা দুটোই লিখুন'); return; }
     cat.stories.push({ id: uid(), title, body, readtime: estimateReadtime(body) });
+    await saveData([cat.stories[cat.stories.length-1].id]);
   } else {
     if(!body){ showToast('লেখা লিখুন'); return; }
     const epInput = document.getElementById('storyEpInput');
@@ -1983,8 +2019,8 @@ async function saveNewStory(){
     if(cat.stories.some(s=>s.epNum===epNum)){ showToast('এই পর্ব নম্বর আগে থেকেই আছে'); return; }
     const newStory = { id: uid(), title: `পর্ব ${toBengaliNum(epNum)}`, body, readtime: estimateReadtime(body), epNum };
     cat.stories.push(newStory);
+    await saveData([newStory.id]);
   }
-  await saveData();
   closeModal();
   renderToc();
   showToast(isSeries ? 'পর্ব যুক্ত হয়েছে' : 'গল্প যুক্ত হয়েছে');
@@ -2028,7 +2064,7 @@ async function saveEditStory(){
     if(!title || !body){ showToast('টাইটেল ও লেখা দুটোই লিখুন'); return; }
   }
   s.title = title; s.body = body; s.readtime = estimateReadtime(body);
-  await saveData();
+  await saveData([s.id]);
   closeModal();
   renderStory(s.id, window.scrollY);
   showToast(isSeries ? 'পর্ব আপডেট হয়েছে' : 'গল্প আপডেট হয়েছে');
@@ -2047,10 +2083,11 @@ function confirmDeleteStory(){
 }
 async function deleteStory(){
   const cat = getCat();
+  const deletedId = currentStoryId;
   DATA.favorites = DATA.favorites.filter(f=>!(f.catId===currentCatId && f.storyId===currentStoryId));
   if(DATA.lastRead && DATA.lastRead.storyId===currentStoryId) DATA.lastRead = null;
   cat.stories = cat.stories.filter(s=>s.id!==currentStoryId);
-  await saveData();
+  await saveData([], [deletedId]);
   closeModal();
   showToast('গল্প ডিলিট হয়েছে');
   goBackInApp();
@@ -2854,15 +2891,18 @@ async function handleDocxFile(e){
     const useHeadingTitles = chapters.length > 1 && chapters.some(ch => ch.title);
     const fallbackTitle = file.name.replace(/\.docx$/i,'');
     let addedCount = 0;
+    const addedIds = [];
     chapters.forEach((ch, idx)=>{
       if(!ch.body) return;
       const title = (useHeadingTitles && ch.title) ? ch.title : (chapters.length > 1 ? `${fallbackTitle} ${toBengaliNum(idx+1)}` : fallbackTitle);
-      cat.stories.push({ id: uid(), title, body: ch.body, readtime: estimateReadtime(ch.body) });
+      const newId = uid();
+      cat.stories.push({ id: newId, title, body: ch.body, readtime: estimateReadtime(ch.body) });
+      addedIds.push(newId);
       addedCount++;
     });
     if(!addedCount){ showToast('ফাইলের ভেতরে কোনো লেখা পাওয়া যায়নি'); return; }
 
-    await saveData();
+    await saveData(addedIds);
     showToast(`${toBengaliNum(addedCount)} টি গল্প যোগ হয়েছে`);
     renderToc();
   }catch(err){
@@ -2871,63 +2911,92 @@ async function handleDocxFile(e){
   }
 }
 
-/* ── Blogger XML এক্সপোর্ট আপলোড — প্রতিটা পোস্ট আলাদা আলাদা গল্প হিসেবে যোগ করা ── */
-function triggerBloggerXmlUpload(){
-  const inp = document.getElementById('bloggerXmlFileInput');
+/* ── Blogger এক্সপোর্ট (.xml) থেকে সব পোস্ট গল্প হিসেবে বাল্ক-আপলোড ──
+   Blogger-এর Settings > Manage blog > Back up content দিয়ে এক্সপোর্ট করা ফাইলে
+   পোস্ট, পেজ, কমেন্ট সবকিছু একই <entry> স্ট্রাকচারে মেশানো থাকে — তাই শুধু আসল
+   ব্লগ-পোস্টগুলো বেছে নেওয়া হয় (kind#post ক্যাটাগরি চেক করে) */
+function triggerBloggerUpload(){
+  const inp = document.getElementById('bloggerFileInput');
   if(!inp) return;
   inp.value = '';
   inp.click();
 }
-
-// Blogger-এর XML export থেকে শুধু আসল পোস্ট (draft/template/settings বাদে) বের করে
-// প্রতিটার টাইটেল ও কনটেন্ট (HTML ভেতরে HTML-এস্কেপ করা থাকে) নিয়ে আসা
-function parseBloggerXml(xmlText){
-  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-  if(doc.querySelector('parsererror')) throw new Error('ফাইলটা বৈধ XML না');
-  const entries = Array.from(doc.getElementsByTagName('entry'));
-  const posts = [];
-  entries.forEach(entry=>{
-    const cats = Array.from(entry.getElementsByTagName('category'));
-    const isPost = cats.some(c => c.getAttribute('scheme') === 'http://schemas.google.com/g/2005#kind'
-      && c.getAttribute('term') === 'http://schemas.google.com/blogger/2008/kind#post');
-    if(!isPost) return;
-    const draftEl = entry.getElementsByTagName('app:draft')[0] || entry.getElementsByTagName('draft')[0];
-    const isDraft = draftEl && draftEl.textContent.trim().toLowerCase() === 'yes';
-    if(isDraft) return; // অপ্রকাশিত ড্রাফট পোস্ট বাদ
-    const titleEl = entry.getElementsByTagName('title')[0];
-    const contentEl = entry.getElementsByTagName('content')[0];
-    const publishedEl = entry.getElementsByTagName('published')[0];
-    const title = titleEl ? titleEl.textContent.replace(/\s+/g,' ').trim() : '';
-    const rawHtml = contentEl ? contentEl.textContent : '';
-    const body = extractTextFromHtml(rawHtml);
-    const published = publishedEl ? publishedEl.textContent.trim() : '';
-    if(body) posts.push({ title: title || 'শিরোনামহীন', body, published });
-  });
-  // পুরনো থেকে নতুন — ব্লগে যেভাবে লেখা হয়েছিল সেই ক্রমে
-  posts.sort((a,b)=> (a.published||'').localeCompare(b.published||''));
-  return posts;
+function isBloggerPostEntry(entry){
+  const cats = entry.getElementsByTagName('category');
+  for(let i=0;i<cats.length;i++){
+    const scheme = cats[i].getAttribute('scheme') || '';
+    const term = cats[i].getAttribute('term') || '';
+    if(scheme.indexOf('#kind') !== -1 && term.indexOf('#post') !== -1) return true;
+  }
+  return false;
 }
-
-async function handleBloggerXmlFile(e){
+function getEntryChildText(entry, tagName){
+  const els = entry.getElementsByTagName(tagName);
+  return els.length ? els[0].textContent : '';
+}
+async function handleBloggerFile(e){
   const file = e.target.files && e.target.files[0];
   if(!file) return;
-  if(!/\.xml$/i.test(file.name)){ showToast('একটা .xml ফাইল বাছাই করুন'); return; }
+  if(!/\.xml$/i.test(file.name)){ showToast('Blogger থেকে এক্সপোর্ট করা .xml ফাইল বাছাই করুন'); return; }
   const cat = getCat();
   if(!cat){ showToast('আগে একটা ক্যাটাগরিতে ঢুকুন'); return; }
-  showToast('ফাইল পড়া হচ্ছে, একটু অপেক্ষা করুন…');
+  const sizeMB = file.size / (1024*1024);
+  showToast(sizeMB > 8 ? 'বড় ফাইল — পড়তে কিছুটা সময় লাগবে, অ্যাপ বন্ধ করবেন না…' : 'ফাইল পড়া হচ্ছে, একটু অপেক্ষা করুন…');
+  // ব্রাউজারকে toast-টা আঁকার (paint) সুযোগ দেওয়া, তারপরই ভারী কাজ শুরু করা
+  await new Promise(r=>setTimeout(r, 30));
   try{
-    const text = await file.text();
-    const posts = parseBloggerXml(text);
-    if(!posts.length){ showToast('ফাইলের ভেতরে কোনো প্রকাশিত পোস্ট পাওয়া যায়নি'); return; }
-    posts.forEach(p=>{
-      cat.stories.push({ id: uid(), title: p.title, body: p.body, readtime: estimateReadtime(p.body) });
-    });
-    await saveData();
-    showToast(`${toBengaliNum(posts.length)} টি গল্প যোগ হয়েছে`);
+    const xmlText = await file.text();
+    const xmlDoc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if(xmlDoc.getElementsByTagName('parsererror').length){ showToast('ফাইলটা পড়া যায়নি — সঠিক Blogger এক্সপোর্ট ফাইল কিনা দেখুন'); return; }
+
+    const entries = Array.from(xmlDoc.getElementsByTagName('entry')).filter(isBloggerPostEntry);
+    if(!entries.length){ showToast('এই ফাইলে কোনো ব্লগ পোস্ট পাওয়া যায়নি'); return; }
+
+    // বড় ফাইলে (হাজার হাজার পোস্ট) একসাথে সব প্রসেস করলে ব্রাউজার কিছুক্ষণের জন্য জমে যেতে পারে (unresponsive),
+    // তাই অল্প অল্প করে (চাংকে) প্রসেস করে মাঝে মাঝে ব্রাউজারকে "শ্বাস নেওয়ার" সুযোগ দেওয়া হয় —
+    // এতে অ্যাপ freeze না হয়ে চলতে থাকে এবং প্রগ্রেস দেখানো যায়
+    const CHUNK_SIZE = 150;
+    const posts = [];
+    for(let i=0; i<entries.length; i+=CHUNK_SIZE){
+      const chunk = entries.slice(i, i+CHUNK_SIZE);
+      chunk.forEach(entry=>{
+        const title = getEntryChildText(entry, 'title').trim() || 'শিরোনামহীন';
+        const contentHtml = getEntryChildText(entry, 'content');
+        const body = extractTextFromHtml(contentHtml || '');
+        const published = getEntryChildText(entry, 'published') || '';
+        if(body) posts.push({ title, body, published });
+      });
+      if(entries.length > CHUNK_SIZE){
+        showToast(`পোস্ট পড়া হচ্ছে… ${toBengaliNum(Math.min(i+CHUNK_SIZE, entries.length))}/${toBengaliNum(entries.length)}`);
+      }
+      await new Promise(r=>setTimeout(r, 0)); // মূল থ্রেড ছেড়ে দেওয়া (UI ফ্রিজ এড়াতে)
+    }
+    if(!posts.length){ showToast('কোনো পোস্টের লেখা খুঁজে পাওয়া যায়নি'); return; }
+
+    // পুরনো পোস্ট আগে, নতুন পোস্ট পরে — স্বাভাবিক পড়ার ক্রম অনুযায়ী সাজানো
+    posts.sort((a,b)=> new Date(a.published) - new Date(b.published));
+
+    const addedIds = [];
+    for(let i=0; i<posts.length; i+=CHUNK_SIZE){
+      const chunk = posts.slice(i, i+CHUNK_SIZE);
+      chunk.forEach(p=>{
+        const newId = uid();
+        cat.stories.push({ id: newId, title: p.title, body: p.body, readtime: estimateReadtime(p.body) });
+        addedIds.push(newId);
+      });
+      if(posts.length > CHUNK_SIZE){
+        showToast(`গল্প যোগ হচ্ছে… ${toBengaliNum(Math.min(i+CHUNK_SIZE, posts.length))}/${toBengaliNum(posts.length)}`);
+      }
+      await new Promise(r=>setTimeout(r, 0));
+    }
+
+    showToast('ক্লাউডে সেভ হচ্ছে, একটু অপেক্ষা করুন…');
+    await saveData(addedIds);
+    showToast(`${toBengaliNum(addedIds.length)} টি গল্প যোগ হয়েছে`);
     renderToc();
   }catch(err){
     console.log('blogger xml parse error', err);
-    showToast('ফাইলটা পড়া যায়নি। এটা বৈধ Blogger XML এক্সপোর্ট কিনা দেখুন।');
+    showToast('ফাইলটা পড়া যায়নি। এক্সপোর্ট ফাইলটা ঠিক আছে কিনা দেখুন।');
   }
 }
 
