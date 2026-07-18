@@ -681,6 +681,7 @@
 
 <input type="file" id="epubFileInput" accept=".epub" style="display:none" onchange="handleEpubFile(event)">
 <input type="file" id="docxFileInput" accept=".docx" style="display:none" onchange="handleDocxFile(event)">
+<input type="file" id="bloggerXmlFileInput" accept=".xml" style="display:none" onchange="handleBloggerXmlFile(event)">
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
   <div class="modal-card" id="modalCard"></div>
 </div>
@@ -1937,6 +1938,7 @@ function openShortStoryAddMenu(){
     <div class="btn-row" style="flex-direction:column;gap:12px;">
       <button class="btn btn-primary" style="width:100%;" onclick="openAddStory()">＋ নতুন গল্প</button>
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerDocxUpload()">📄 Word (.docx) থেকে টাইটেল অনুযায়ী গল্প যোগ করুন</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerBloggerXmlUpload()">🌐 Blogger XML ফাইল থেকে সব গল্প যোগ করুন</button>
     </div>
   `);
 }
@@ -2866,6 +2868,66 @@ async function handleDocxFile(e){
   }catch(err){
     console.log('docx parse error', err);
     showToast('ফাইলটা পড়া যায়নি। ফাইলটা ক্ষতিগ্রস্ত হতে পারে।');
+  }
+}
+
+/* ── Blogger XML এক্সপোর্ট আপলোড — প্রতিটা পোস্ট আলাদা আলাদা গল্প হিসেবে যোগ করা ── */
+function triggerBloggerXmlUpload(){
+  const inp = document.getElementById('bloggerXmlFileInput');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+// Blogger-এর XML export থেকে শুধু আসল পোস্ট (draft/template/settings বাদে) বের করে
+// প্রতিটার টাইটেল ও কনটেন্ট (HTML ভেতরে HTML-এস্কেপ করা থাকে) নিয়ে আসা
+function parseBloggerXml(xmlText){
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if(doc.querySelector('parsererror')) throw new Error('ফাইলটা বৈধ XML না');
+  const entries = Array.from(doc.getElementsByTagName('entry'));
+  const posts = [];
+  entries.forEach(entry=>{
+    const cats = Array.from(entry.getElementsByTagName('category'));
+    const isPost = cats.some(c => c.getAttribute('scheme') === 'http://schemas.google.com/g/2005#kind'
+      && c.getAttribute('term') === 'http://schemas.google.com/blogger/2008/kind#post');
+    if(!isPost) return;
+    const draftEl = entry.getElementsByTagName('app:draft')[0] || entry.getElementsByTagName('draft')[0];
+    const isDraft = draftEl && draftEl.textContent.trim().toLowerCase() === 'yes';
+    if(isDraft) return; // অপ্রকাশিত ড্রাফট পোস্ট বাদ
+    const titleEl = entry.getElementsByTagName('title')[0];
+    const contentEl = entry.getElementsByTagName('content')[0];
+    const publishedEl = entry.getElementsByTagName('published')[0];
+    const title = titleEl ? titleEl.textContent.replace(/\s+/g,' ').trim() : '';
+    const rawHtml = contentEl ? contentEl.textContent : '';
+    const body = extractTextFromHtml(rawHtml);
+    const published = publishedEl ? publishedEl.textContent.trim() : '';
+    if(body) posts.push({ title: title || 'শিরোনামহীন', body, published });
+  });
+  // পুরনো থেকে নতুন — ব্লগে যেভাবে লেখা হয়েছিল সেই ক্রমে
+  posts.sort((a,b)=> (a.published||'').localeCompare(b.published||''));
+  return posts;
+}
+
+async function handleBloggerXmlFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!/\.xml$/i.test(file.name)){ showToast('একটা .xml ফাইল বাছাই করুন'); return; }
+  const cat = getCat();
+  if(!cat){ showToast('আগে একটা ক্যাটাগরিতে ঢুকুন'); return; }
+  showToast('ফাইল পড়া হচ্ছে, একটু অপেক্ষা করুন…');
+  try{
+    const text = await file.text();
+    const posts = parseBloggerXml(text);
+    if(!posts.length){ showToast('ফাইলের ভেতরে কোনো প্রকাশিত পোস্ট পাওয়া যায়নি'); return; }
+    posts.forEach(p=>{
+      cat.stories.push({ id: uid(), title: p.title, body: p.body, readtime: estimateReadtime(p.body) });
+    });
+    await saveData();
+    showToast(`${toBengaliNum(posts.length)} টি গল্প যোগ হয়েছে`);
+    renderToc();
+  }catch(err){
+    console.log('blogger xml parse error', err);
+    showToast('ফাইলটা পড়া যায়নি। এটা বৈধ Blogger XML এক্সপোর্ট কিনা দেখুন।');
   }
 }
 
