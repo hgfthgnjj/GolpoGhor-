@@ -16,6 +16,7 @@
     --plum:#54395E; --text:#2B2014; --slate:#6B5C4A; --danger:#9B3030;
     --surface:#FBF1E2; --surface-shadow:#EFE0C5; --heading:#5A3D26;
     --reading-font:'Hind Siliguri', sans-serif;
+    --reading-font-weight:700;
   }
   html.dark{
     --ink:#1A1208; --ink-light:#2E2117; --paper:#241A12; --paper-shadow:#352519;
@@ -97,6 +98,20 @@
   .icon-btn.danger{color:#FFB8A8;}
   .toc-wrap{padding:14px 22px 80px;}
   .toc-item{display:flex;align-items:baseline;gap:14px;padding:18px 0;border-bottom:1px solid var(--surface-shadow);cursor:pointer;}
+  .toc-item-selected{background:rgba(199,145,64,.10);border-radius:10px;padding-left:8px;padding-right:8px;margin:0 -8px;}
+  .bulk-checkbox{width:22px;height:22px;border-radius:7px;border:2px solid var(--gold-deep);flex-shrink:0;align-self:center;
+    display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:700;transition:background .15s;}
+  .bulk-checkbox.checked{background:var(--gold-deep);}
+  .bulk-action-bar{position:fixed;left:0;right:0;bottom:-100px;background:var(--ink);color:var(--paper);
+    padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    box-shadow:0 -6px 18px rgba(0,0,0,.25);transition:bottom .22s ease;z-index:55;}
+  .bulk-action-bar.open{bottom:0;}
+  .bulk-count{font-family:'Hind Siliguri',sans-serif;font-size:13.5px;color:#D9C4A8;white-space:nowrap;}
+  .bulk-action-btns{display:flex;gap:10px;}
+  .bulk-btn{border:none;border-radius:10px;padding:10px 16px;font-family:'Hind Siliguri',sans-serif;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .bulk-btn.bulk-move{background:rgba(255,255,255,.14);color:var(--paper);}
+  .bulk-btn.bulk-delete{background:#B5432F;color:#fff;}
+  #selectModeBtn{font-size:17px;}
   .toc-item:active{opacity:.6;}
   .toc-num{font-family:'Tiro Bangla',serif;font-size:15px;color:var(--gold-deep);flex-shrink:0;width:26px;}
   .toc-text{flex:1;}
@@ -124,7 +139,7 @@
   .story-cat-tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-deep);font-weight:600;}
   .story-title{font-family:'Tiro Bangla',serif;font-size:25px;line-height:1.35;margin:10px 0 8px;color:var(--heading);}
   .story-meta{font-size:13px;color:var(--slate);}
-  .story-body{padding:22px 24px 80px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);font-weight:500;transition:font-size .15s ease;
+  .story-body{padding:22px 24px 80px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);font-weight:var(--reading-font-weight,500);transition:font-size .15s ease;
     -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
     -webkit-touch-callout:none;}
   .font-option{padding:14px 16px;border:1.5px solid var(--surface-shadow);border-radius:10px;margin-bottom:10px;cursor:pointer;font-size:16px;color:var(--text);display:flex;flex-direction:column;gap:4px;}
@@ -161,7 +176,7 @@
   .para-section-bookmark{background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:8px;font-size:16px;color:var(--slate);transition:color .15s,transform .15s;flex-shrink:0;}
   .para-section-bookmark:active{transform:scale(.85);}
   .para-section-bookmark.bookmarked{color:var(--gold);}
-  .para-section-content p{margin:0 0 14px;font-size:inherit;line-height:1.95;color:var(--text);font-family:var(--reading-font);font-weight:500;transition:font-size .15s ease;}
+  .para-section-content p{margin:0 0 14px;font-size:inherit;line-height:1.95;color:var(--text);font-family:var(--reading-font);font-weight:var(--reading-font-weight,500);transition:font-size .15s ease;}
   .para-section-content p:last-child{margin-bottom:0;}
   .para-section-content p:first-of-type::first-letter{font-family:'Tiro Bangla',serif;font-size:50px;float:left;line-height:.8;padding:6px 8px 0 0;color:var(--gold-deep);}
   .para-section:not(:first-child) .para-section-content p:first-of-type::first-letter{font-size:inherit;float:none;line-height:inherit;padding:0;color:inherit;}
@@ -526,6 +541,12 @@
     <div id="pinSettingsInfo" style="font-size:12px;color:rgba(255,255,255,.35);font-family:'Hind Siliguri',sans-serif;line-height:1.6;"></div>
     <button id="changePinBtn" onclick="startChangePin()" style="display:none;margin-top:10px;width:100%;background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.7);border-radius:10px;padding:11px;font-size:13px;font-family:'Hind Siliguri',sans-serif;cursor:pointer;">🔑 PIN পরিবর্তন করুন</button>
   </div>
+  <div class="drawer-section">
+    <span class="drawer-label">ব্যাকআপ</span>
+    <button class="drawer-btn" style="margin-bottom:10px;" onclick="exportBackup()">⬇️ ব্যাকআপ ডাউনলোড করুন</button>
+    <button class="drawer-btn" onclick="triggerRestoreBackup()">⬆️ ব্যাকআপ থেকে পুনরুদ্ধার করুন</button>
+    <input type="file" id="restoreFileInput" accept=".json" style="display:none" onchange="handleRestoreFile(event)">
+  </div>
 </div>
 
 <div class="reading-progress-bar" id="readingProgressBar"></div>
@@ -597,10 +618,18 @@
       <button class="back-btn" onclick="goBackInApp()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
       <h2 class="topbar-title" id="categoryTitle">ক্যাটাগরি</h2>
       <button class="dark-toggle-btn" id="catDarkToggleBtn" onclick="toggleDarkMode()" title="ডার্ক মোড">🌙</button>
+      <button class="icon-btn" id="selectModeBtn" onclick="toggleSelectionMode()" title="একাধিক বাছাই করুন">☑</button>
       <button class="icon-btn" id="editCatBtn" onclick="openEditCategory()">✎</button>
       <button class="icon-btn danger" id="deleteCatBtn" onclick="confirmDeleteCategory()">🗑</button>
     </div>
     <div class="toc-wrap" id="tocWrap"></div>
+    <div class="bulk-action-bar" id="bulkActionBar">
+      <span class="bulk-count" id="bulkCount">০ টি বাছাই করা হয়েছে</span>
+      <div class="bulk-action-btns">
+        <button class="bulk-btn bulk-move" onclick="openBulkMoveModal()">📁 সরান</button>
+        <button class="bulk-btn bulk-delete" onclick="confirmBulkDelete()">🗑 মুছুন</button>
+      </div>
+    </div>
     <button class="category-fab" id="categoryFab" onclick="handleCategoryFabClick()" title="নতুন গল্প যুক্ত করুন">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
@@ -950,6 +979,17 @@ async function saveData(){
     console.log('cloud save queued (offline) or failed', e);
   }
 }
+// শুধু "পড়ার জায়গা" (স্ক্রল পজিশন) সেভ করার জন্য — এটা স্ক্রল করার সময় বারবার (প্রতি ২৫০ms-এ)
+// ট্রিগার হয়, তাই এখানে ইচ্ছাকৃতভাবে pushAllToCloud() কল করা হয় না। pushAllToCloud() পুরো লাইব্রেরির
+// সব গল্প আবার লিখে ফেলে (STORIES_COL থেকে পড়ে + সব গল্প ব্যাচে আবার সেভ করে) — সেটা স্ক্রল করলেই
+// বারবার চালালে অ্যাপ স্লো হয়ে যায় এবং অকারণে অনেক বেশি Firestore রিড/রাইট খরচ হয়। তাই শুধু
+// ছোট্ট lastRead তথ্যটুকু META_DOC-এ merge করে আপডেট করা হয়, বাকি গল্পগুলো স্পর্শও করা হয় না।
+async function saveReadingState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+  try{
+    await META_DOC.set({ data: { lastRead: DATA.lastRead }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  }catch(e){ console.log('reading state cloud save failed (offline or error)', e); }
+}
 async function loadDarkMode(){
   try{
     if(localStorage.getItem(DARK_KEY) === 'on'){
@@ -1088,9 +1128,8 @@ function popOverlayHistory(closeFn){
   }
 }
 // ড্রয়ার বন্ধ করে সাথে সাথেই আরেকটা মোডাল (ফন্ট/এডিট/ডিলিট) খোলার সময় এটা ব্যবহার হয়।
-// শুধু history.back() না করে ড্রয়ারকে স্ট্যাক থেকে সরিয়ে next push-টা history-তে না জমিয়ে
-// সরাসরি বদলে দেওয়া হয় — নাহলে পরপর history.back() আর pushState একসাথে ঘটলে
-// নতুন খোলা মোডালটাই ভুলবশত সাথে সাথে বন্ধ হয়ে যায়।
+// history.back() আর pushState একসাথে ঘটলে নতুন খোলা মোডালটাই ভুলবশত সাথে সাথে বন্ধ হয়ে যেত,
+// তাই এখানে হিস্ট্রি স্পর্শ না করে সরাসরি ওভারলে স্ট্যাকে বদলে দেওয়া হয়
 function closeReaderDrawerForSwap(){
   document.getElementById('readerDrawer').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
@@ -1106,7 +1145,7 @@ function goBackInApp(){
   if(activeView === 'story'){
     if(DATA.lastRead && DATA.lastRead.storyId === currentStoryId){
       DATA.lastRead.scrollY = window.scrollY;
-      saveData();
+      saveReadingState();
     }
     if(cameFromFavorites){ currentCatId = '__fav__'; renderFavoritesToc(); setView('category','back'); }
     else if(cameFromWishlist){ renderWishlistToc(); setView('wishlist','back'); }
@@ -1206,25 +1245,124 @@ function renderTypeList(){
 
 /* ---------- CATEGORY / TOC ---------- */
 function openCategory(id){
+  if(selectionMode) popOverlayHistory(exitSelectionMode);
   currentCatId = id;
+  selectionMode = false;
+  selectedStoryIds = new Set();
   safeHistory(()=>history.pushState({view:'category', catId:id}, '', '#cat'));
   renderToc();
   setView('category','forward');
 }
 function getCat(){ return DATA.categories.find(c=>c.id===currentCatId); }
 
+/* ── একাধিক বাছাই (Bulk select) ── */
+let selectionMode = false;
+let selectedStoryIds = new Set();
+function toggleSelectionMode(){
+  if(!selectionMode){
+    selectionMode = true;
+    selectedStoryIds = new Set();
+    pushOverlay(exitSelectionMode);
+    renderToc();
+  } else {
+    exitSelectionMode();
+  }
+}
+function exitSelectionMode(fromPopstate){
+  selectionMode = false;
+  selectedStoryIds = new Set();
+  if(!fromPopstate) popOverlayHistory(exitSelectionMode);
+  renderToc();
+}
+function toggleSelectItem(id){
+  if(selectedStoryIds.has(id)) selectedStoryIds.delete(id); else selectedStoryIds.add(id);
+  renderToc();
+}
+function updateBulkBar(){
+  const bar = document.getElementById('bulkActionBar');
+  const cnt = document.getElementById('bulkCount');
+  if(!bar) return;
+  bar.classList.toggle('open', selectionMode);
+  if(cnt) cnt.textContent = `${toBengaliNum(selectedStoryIds.size)} টি বাছাই করা হয়েছে`;
+}
+function confirmBulkDelete(){
+  if(!selectedStoryIds.size){ showToast('কিছু বাছাই করুন'); return; }
+  openModal(`
+    <h3 class="modal-title">${toBengaliNum(selectedStoryIds.size)} টি মুছে ফেলবেন?</h3>
+    <p style="color:var(--slate);font-size:14px;margin-bottom:18px;">এই কাজটি ফেরানো যাবে না।</p>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="closeModal()">বাতিল</button>
+      <button class="btn btn-primary" style="background:#B5432F;" onclick="doBulkDelete()">মুছে ফেলুন</button>
+    </div>
+  `);
+}
+async function doBulkDelete(){
+  const cat = getCat();
+  if(!cat) return;
+  cat.stories = cat.stories.filter(s => !selectedStoryIds.has(s.id));
+  await saveData();
+  closeModal();
+  showToast('মুছে ফেলা হয়েছে');
+  exitSelectionMode();
+}
+function openBulkMoveModal(){
+  if(!selectedStoryIds.size){ showToast('কিছু বাছাই করুন'); return; }
+  const cat = getCat();
+  if(!cat) return;
+  const targets = DATA.categories.filter(c => c.id !== cat.id && c.type === cat.type);
+  if(!targets.length){ showToast('সরানোর জন্য উপযুক্ত অন্য কোনো ক্যাটাগরি/সিরিজ নেই'); return; }
+  openModal(`
+    <h3 class="modal-title">কোথায় সরাতে চান?</h3>
+    <div class="btn-row" style="flex-direction:column;gap:10px;max-height:50vh;overflow-y:auto;">
+      ${targets.map(c => `
+        <button class="btn btn-ghost" style="width:100%;justify-content:flex-start;gap:10px;display:flex;align-items:center;" onclick="doBulkMove('${c.id}')">
+          <span>${c.emoji || (c.type==='series'?'📗':'📚')}</span><span>${escapeHtml(c.name)}</span>
+        </button>`).join('')}
+    </div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal()">বাতিল</button>
+    </div>
+  `);
+}
+async function doBulkMove(targetCatId){
+  const cat = getCat();
+  const target = DATA.categories.find(c=>c.id===targetCatId);
+  if(!cat || !target) return;
+  const moving = cat.stories.filter(s => selectedStoryIds.has(s.id));
+  if(!moving.length){ closeModal(); return; }
+  if(target.type === 'series'){
+    let nextEp = target.stories.reduce((m,s)=>Math.max(m, s.epNum||0), 0);
+    moving.forEach(s=>{
+      nextEp += 1;
+      s.epNum = nextEp;
+      s.title = `পর্ব ${toBengaliNum(nextEp)}`;
+      target.stories.push(s);
+    });
+  } else {
+    moving.forEach(s=>{ delete s.epNum; target.stories.push(s); });
+  }
+  cat.stories = cat.stories.filter(s => !selectedStoryIds.has(s.id));
+  await saveData();
+  closeModal();
+  showToast(`"${target.name}"-এ সরানো হয়েছে`);
+  exitSelectionMode();
+}
+
 function renderToc(){
   const cat = getCat();
   if(!cat) return;
   document.getElementById('categoryTitle').textContent = cat.name;
-  document.getElementById('editCatBtn').style.display = '';
-  document.getElementById('deleteCatBtn').style.display = '';
+  const selBtn = document.getElementById('selectModeBtn');
+  if(selBtn){ selBtn.style.display = ''; selBtn.textContent = selectionMode ? '✕' : '☑'; selBtn.title = selectionMode ? 'বাছাই বাতিল করুন' : 'একাধিক বাছাই করুন'; }
+  document.getElementById('editCatBtn').style.display = selectionMode ? 'none' : '';
+  document.getElementById('deleteCatBtn').style.display = selectionMode ? 'none' : '';
   const isSeries = cat.type === 'series';
   const fab = document.getElementById('categoryFab');
   if(fab){
-    fab.style.display = '';
+    fab.style.display = selectionMode ? 'none' : '';
     fab.title = isSeries ? 'নতুন পর্ব যুক্ত করুন' : 'নতুন গল্প যুক্ত করুন';
   }
+  updateBulkBar();
   const wrap = document.getElementById('tocWrap');
   const readSet = getReadSet();
   const storiesOrdered = isSeries
@@ -1232,9 +1370,13 @@ function renderToc(){
     : cat.stories;
   const items = storiesOrdered.map((s, idx)=>{
     const read = readSet.has(currentCatId+'::'+s.id);
+    const checked = selectedStoryIds.has(s.id);
+    const tapHandler = selectionMode ? `toggleSelectItem('${s.id}')` : `openStory('${s.id}')`;
+    const checkboxHtml = selectionMode ? `<span class="bulk-checkbox ${checked?'checked':''}">${checked?'✓':''}</span>` : '';
     if(isSeries){
       const epLabel = `পর্ব ${toBengaliNum(s.epNum!=null ? s.epNum : (idx+1))}`;
-      return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
+      return `<div class="toc-item ${checked?'toc-item-selected':''}" data-idx="${idx}" onclick="${tapHandler}">
+        ${checkboxHtml}
         <span class="ep-read-dot" style="${read ? 'background:#3FAE58;box-shadow:0 0 0 3px rgba(63,174,88,.22);' : 'background:transparent;box-shadow:inset 0 0 0 1.5px var(--surface-shadow);'}"></span>
         <div class="toc-text">
           <p class="toc-title">${epLabel}${read?'<span class=\'read-badge\' style=\'background:#3FAE58;color:#fff;\'>✓ পড়া হয়েছে</span>':''}</p>
@@ -1243,8 +1385,9 @@ function renderToc(){
       </div>`;
     }
     const numLabel = String(idx+1).padStart(2,'0');
-    return `<div class="toc-item" data-idx="${idx}" onclick="openStory('${s.id}')">
-      <span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>
+    return `<div class="toc-item ${checked?'toc-item-selected':''}" data-idx="${idx}" onclick="${tapHandler}">
+      ${selectionMode ? '' : `<span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>`}
+      ${checkboxHtml}
       <span class="toc-num">${numLabel}</span>
       <span class="ep-read-dot" style="${read ? 'background:#3FAE58;box-shadow:0 0 0 3px rgba(63,174,88,.22);' : 'background:transparent;box-shadow:inset 0 0 0 1.5px var(--surface-shadow);'}"></span>
       <div class="toc-text">
@@ -1265,7 +1408,7 @@ function renderToc(){
       <p>নিচের বাটনে চাপ দিয়ে প্রথম গল্পটা যুক্ত করুন।</p>
     </div>`);
   wrap.innerHTML = items + emptyMsg;
-  if(!isSeries) setTimeout(makeTocDraggable, 50);
+  if(!isSeries && !selectionMode) setTimeout(makeTocDraggable, 50);
 }
 
 function openFavorites(){
@@ -1278,6 +1421,8 @@ function renderFavoritesToc(){
   document.getElementById('categoryTitle').textContent = 'পছন্দের গল্প';
   document.getElementById('editCatBtn').style.display = 'none';
   document.getElementById('deleteCatBtn').style.display = 'none';
+  const favSelBtn = document.getElementById('selectModeBtn');
+  if(favSelBtn) favSelBtn.style.display = 'none';
   const favFab = document.getElementById('categoryFab');
   if(favFab) favFab.style.display = 'none';
   const wrap = document.getElementById('tocWrap');
@@ -1470,7 +1615,7 @@ function renderStory(id, scrollTo){
 
   updateReadingProgress();
   DATA.lastRead = { catId: currentCatId, storyId: id, scrollY: scrollTo || 0 };
-  saveData();
+  saveReadingState();
   window.scrollTo({ top: 0, behavior: 'auto' });
   if(scrollTo > 0){
     setTimeout(()=>{ window.scrollTo({ top: scrollTo, behavior: 'auto' }); }, 550);
@@ -1558,7 +1703,7 @@ window.addEventListener('scroll', ()=>{
     clearTimeout(scrollSaveTimer);
     scrollSaveTimer = setTimeout(()=>{
       DATA.lastRead.scrollY = window.scrollY;
-      saveData();
+      saveReadingState();
     }, 250);
   }
 });
@@ -1567,13 +1712,13 @@ window.addEventListener('scroll', ()=>{
 window.addEventListener('pagehide', ()=>{
   if(currentStoryId && DATA.lastRead && DATA.lastRead.storyId===currentStoryId){
     DATA.lastRead.scrollY = window.scrollY;
-    saveData();
+    saveReadingState();
   }
 });
 window.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState==='hidden' && currentStoryId && DATA.lastRead && DATA.lastRead.storyId===currentStoryId){
     DATA.lastRead.scrollY = window.scrollY;
-    saveData();
+    saveReadingState();
   }
 });
 
@@ -1610,18 +1755,23 @@ function showStoryHeaderInitial(){
 /* ---------- FONT PICKER ---------- */
 const FONT_KEY = 'golpoghor-font';
 const FONTS = [
-  {family:'Hind Siliguri', label:'হিন্দ শিলিগুড়ি'},
-  {family:'Noto Sans Bengali', label:'নোটো সান্স বেঙ্গলি'},
-  {family:'Noto Serif Bengali', label:'নোটো সেরিফ বেঙ্গলি'},
-  {family:'Baloo Da 2', label:'বালু দা'},
-  {family:'Adorsho Lipi', label:'আদর্শ লিপি'},
-  {family:'Kalpurush', label:'কালপুরুষ'},
-  {family:'Nikosh', label:'নিকোশ'},
+  {family:'Hind Siliguri', label:'হিন্দ শিলিগুড়ি', weight:700},
+  {family:'Noto Sans Bengali', label:'নোটো সান্স বেঙ্গলি', weight:700},
+  {family:'Noto Serif Bengali', label:'নোটো সেরিফ বেঙ্গলি', weight:700},
+  {family:'Baloo Da 2', label:'বালু দা', weight:700},
+  {family:'Adorsho Lipi', label:'আদর্শ লিপি', weight:700},
+  {family:'Kalpurush', label:'কালপুরুষ', weight:700},
+  {family:'Nikosh', label:'নিকোশ', weight:700},
+  {family:'Nirmala UI', label:'নির্মলা ইউআই বোল্ড', weight:700},
 ];
 function loadFontPref(){
   try{
     const f = localStorage.getItem(FONT_KEY);
-    if(f) document.documentElement.style.setProperty('--reading-font', `'${f}', sans-serif`);
+    if(f){
+      document.documentElement.style.setProperty('--reading-font', `'${f}', sans-serif`);
+      const meta = FONTS.find(x=>x.family===f);
+      document.documentElement.style.setProperty('--reading-font-weight', (meta && meta.weight) ? meta.weight : 500);
+    }
   }catch(e){}
 }
 function currentFontFamily(){
@@ -1632,15 +1782,18 @@ function openFontPicker(){
   openModal(`
     <h3 class="modal-title">পড়ার ফন্ট বেছে নিন</h3>
     ${FONTS.map(f=>`
-      <div class="font-option ${f.family===current?'selected':''}" style="font-family:'${f.family}',sans-serif" onclick="applyFont('${f.family}')">
+      <div class="font-option ${f.family===current?'selected':''}" style="font-family:'${f.family}',sans-serif;font-weight:${f.weight||500};" onclick="applyFont('${f.family}')">
         <span>${f.label}</span>
         <span class="font-sample">বাংলা ভাষায় গল্প পড়ার নমুনা লেখা</span>
       </div>`).join('')}
+    <p style="font-size:12px;color:var(--slate);margin-top:8px;line-height:1.6;">নোট: "নির্মলা ইউআই বোল্ড" একটা সিস্টেম ফন্ট — কম্পিউটারে সাধারণত থাকে, কিন্তু কিছু ফোনে না-ও থাকতে পারে, সেক্ষেত্রে স্বয়ংক্রিয়ভাবে অন্য ফন্টে দেখাবে।</p>
     <div class="btn-row"><button class="btn btn-ghost" onclick="closeModal()">বন্ধ করুন</button></div>
   `);
 }
 function applyFont(family){
   document.documentElement.style.setProperty('--reading-font', `'${family}', sans-serif`);
+  const meta = FONTS.find(x=>x.family===family);
+  document.documentElement.style.setProperty('--reading-font-weight', (meta && meta.weight) ? meta.weight : 500);
   try{ localStorage.setItem(FONT_KEY, family); }catch(e){}
   closeModal();
   showToast('ফন্ট পরিবর্তন হয়েছে');
@@ -2561,6 +2714,8 @@ function renderAllStoriesToc(){
   document.getElementById('categoryTitle').textContent = 'সব গল্প';
   document.getElementById('editCatBtn').style.display = 'none';
   document.getElementById('deleteCatBtn').style.display = 'none';
+  const allSelBtn = document.getElementById('selectModeBtn');
+  if(allSelBtn) allSelBtn.style.display = 'none';
   const fab = document.getElementById('categoryFab');
   if(fab) fab.style.display = 'none';
   const wrap = document.getElementById('tocWrap');
@@ -2816,6 +2971,96 @@ async function handleEpubFile(e){
   }catch(err){
     console.log('epub parse error', err);
     showToast('EPUB ফাইলটা পড়া যায়নি। ফাইলটা ক্ষতিগ্রস্ত বা DRM-সুরক্ষিত হতে পারে।');
+  }
+}
+
+/* ── ব্যাকআপ / এক্সপোর্ট / রিস্টোর ── */
+function exportBackup(){
+  try{
+    const readSetArr = Array.from(getReadSet());
+    const backup = {
+      app: 'গল্পঘর', backupVersion: 1, exportedAt: new Date().toISOString(),
+      categories: DATA.categories,
+      favorites: DATA.favorites || [],
+      lastRead: DATA.lastRead || null,
+      readSet: readSetArr
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `golpoghor-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    showToast('ব্যাকআপ ডাউনলোড হয়েছে');
+  }catch(err){
+    console.log('export error', err);
+    showToast('ব্যাকআপ তৈরি করা যায়নি');
+  }
+}
+
+function triggerRestoreBackup(){
+  const inp = document.getElementById('restoreFileInput');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+let pendingRestoreBackup = null;
+async function handleRestoreFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if(!backup || !Array.isArray(backup.categories)){
+      showToast('এটা একটা বৈধ গল্পঘর ব্যাকআপ ফাইল না');
+      return;
+    }
+    pendingRestoreBackup = backup;
+    const catCount = backup.categories.length;
+    const storyCount = backup.categories.reduce((n,c)=>n+(c.stories?c.stories.length:0),0);
+    openModal(`
+      <h3 class="modal-title">ব্যাকআপ পুনরুদ্ধার করবেন?</h3>
+      <p style="color:var(--slate);font-size:14px;margin-bottom:18px;line-height:1.7;">
+        এই ফাইলে ${toBengaliNum(catCount)} টি ক্যাটাগরি/সিরিজ ও ${toBengaliNum(storyCount)} টি গল্প/পর্ব আছে।<br>
+        <b style="color:#B5432F;">এটা করলে আপনার এই মুহূর্তের সব গল্প/ক্যাটাগরি মুছে গিয়ে ব্যাকআপ ফাইলেরটা বসে যাবে — এই কাজ ফেরানো যাবে না।</b>
+      </p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="pendingRestoreBackup=null;closeModal()">বাতিল</button>
+        <button class="btn btn-primary" style="background:#B5432F;" onclick="doRestoreBackup()">নিশ্চিত, পুনরুদ্ধার করুন</button>
+      </div>
+    `);
+  }catch(err){
+    console.log('restore parse error', err);
+    showToast('ফাইলটা পড়া যায়নি, এটা ক্ষতিগ্রস্ত হতে পারে');
+  }
+}
+
+async function doRestoreBackup(){
+  const backup = pendingRestoreBackup;
+  if(!backup){ closeModal(); return; }
+  try{
+    DATA.categories = backup.categories || [];
+    DATA.favorites = backup.favorites || [];
+    DATA.lastRead = backup.lastRead || null;
+    if(Array.isArray(backup.readSet)){
+      try{ localStorage.setItem(READ_KEY, JSON.stringify(backup.readSet)); }catch(e){}
+    }
+    await saveData();
+    pendingRestoreBackup = null;
+    closeModal();
+    showToast('পুনরুদ্ধার সম্পন্ন হয়েছে');
+    closeHomeMenu();
+    renderShelf();
+  }catch(err){
+    console.log('restore error', err);
+    pendingRestoreBackup = null;
+    closeModal();
+    showToast('পুনরুদ্ধার করা যায়নি');
   }
 }
 
