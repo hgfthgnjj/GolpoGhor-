@@ -124,7 +124,9 @@
   .story-cat-tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold-deep);font-weight:600;}
   .story-title{font-family:'Tiro Bangla',serif;font-size:25px;line-height:1.35;margin:10px 0 8px;color:var(--heading);}
   .story-meta{font-size:13px;color:var(--slate);}
-  .story-body{padding:22px 24px 80px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);transition:font-size .15s ease;}
+  .story-body{padding:22px 24px 80px;font-size:17px;line-height:1.95;color:var(--text);font-family:var(--reading-font);transition:font-size .15s ease;
+    -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+    -webkit-touch-callout:none;}
   .font-option{padding:14px 16px;border:1.5px solid var(--surface-shadow);border-radius:10px;margin-bottom:10px;cursor:pointer;font-size:16px;color:var(--text);display:flex;flex-direction:column;gap:4px;}
   .font-option.selected{border-color:var(--gold);background:rgba(217,164,65,.08);}
   .font-option .font-sample{color:var(--slate);font-size:14px;}
@@ -620,7 +622,7 @@
       <h1 class="story-title" id="storyTitle"></h1>
       <span class="story-meta" id="storyMeta"></span>
     </div>
-    <div class="story-body" id="storyBody" onclick="handleStoryTap()"></div>
+    <div class="story-body" id="storyBody" onclick="handleStoryTap()" oncontextmenu="return false" oncopy="return false"></div>
 
     <!-- floating menu button -->
     <button class="floating-menu-btn" id="floatingMenuBtn" onclick="openReaderDrawer()">
