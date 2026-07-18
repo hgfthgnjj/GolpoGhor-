@@ -1068,6 +1068,11 @@ function safeHistory(fn){ try{ fn(); }catch(e){ /* history API unavailable in th
    যেন প্রথমে সেটাই বন্ধ হয় (পুরো পেজ/অ্যাপ থেকে বের না হয়ে যায়) */
 let overlayStack = [];
 let suppressNextHistoryPush = false;
+// নিজে থেকে (বাতিল/✕/ব্যাকড্রপ ক্লিক করে) কোনো ওভারলে বন্ধ করলে আমরা history.back() কল করি
+// যাতে হার্ডওয়্যার ব্যাক বাটন সবসময় ঠিকভাবে সিঙ্কে থাকে। কিন্তু history.back() নিজেও একটা
+// popstate ইভেন্ট ছোঁড়ে (asynchronously) — সেই "প্রতিধ্বনি" popstate-টা যেন ভুল করে
+// goBackInApp() চালিয়ে ইউজারকে পুরো গল্প থেকে বের করে না দেয়, তাই এই ফ্ল্যাগ দিয়ে সেটা আলাদা করা হয়
+let ignoreNextPopstate = false;
 function pushOverlay(closeFn){
   overlayStack.push(closeFn);
   if(suppressNextHistoryPush){ suppressNextHistoryPush = false; return; }
@@ -1076,7 +1081,11 @@ function pushOverlay(closeFn){
 function popOverlayHistory(closeFn){
   // ইউজার নিজে (X/বাতিল/ব্যাকড্রপ ক্লিক করে) ওভারলে বন্ধ করলে, হিস্ট্রিতে যোগ করা এন্ট্রিটাও সরিয়ে দেওয়া হয়
   const idx = overlayStack.lastIndexOf(closeFn);
-  if(idx !== -1){ overlayStack.splice(idx,1); safeHistory(()=>history.back()); }
+  if(idx !== -1){
+    overlayStack.splice(idx,1);
+    ignoreNextPopstate = true;
+    safeHistory(()=>history.back());
+  }
 }
 // ড্রয়ার বন্ধ করে সাথে সাথেই আরেকটা মোডাল (ফন্ট/এডিট/ডিলিট) খোলার সময় এটা ব্যবহার হয়।
 // শুধু history.back() না করে ড্রয়ারকে স্ট্যাক থেকে সরিয়ে next push-টা history-তে না জমিয়ে
@@ -1122,6 +1131,7 @@ function goBackInApp(){
 }
 
 window.addEventListener('popstate', ()=>{
+  if(ignoreNextPopstate){ ignoreNextPopstate = false; return; }
   if(overlayStack.length){
     const closeFn = overlayStack.pop();
     try{ closeFn(true); }catch(e){}
