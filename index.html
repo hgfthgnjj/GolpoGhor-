@@ -708,7 +708,7 @@
   </div>
   <div class="drawer-section">
     <span class="drawer-label">ফন্ট</span>
-    <button class="drawer-btn" onclick="openFontPicker();closeReaderDrawer()">🔤 ফন্ট পরিবর্তন</button>
+    <button class="drawer-btn" onclick="closeReaderDrawerForSwap();openFontPicker()">🔤 ফন্ট পরিবর্তন</button>
   </div>
   <div class="drawer-section">
     <span class="drawer-label">ডার্ক মোড</span>
@@ -716,9 +716,9 @@
   </div>
   <div class="drawer-section">
     <span class="drawer-label">গল্প</span>
-    <button class="drawer-btn" onclick="openEditStory();closeReaderDrawer()">✎ গল্প এডিট</button>
+    <button class="drawer-btn" onclick="closeReaderDrawerForSwap();openEditStory()">✎ গল্প এডিট</button>
     <div style="height:1px;background:rgba(255,255,255,0.10);margin:10px 0;border-radius:1px;"></div>
-    <button class="drawer-btn" style="color:#F0B8A8;" onclick="confirmDeleteStory();closeReaderDrawer()">🗑 গল্প মুছুন</button>
+    <button class="drawer-btn" style="color:#F0B8A8;" onclick="closeReaderDrawerForSwap();confirmDeleteStory()">🗑 গল্প মুছুন</button>
   </div>
 </div>
 <div class="para-toc-overlay" id="paraTocOverlay" onclick="if(event.target===this) closeParaToc()">
@@ -1067,14 +1067,27 @@ function safeHistory(fn){ try{ fn(); }catch(e){ /* history API unavailable in th
    মডাল, ড্রয়ার বা অন্য কোনো ওভারলে খোলা থাকলে ফোনের ব্যাক বাটনে চাপ দিলে
    যেন প্রথমে সেটাই বন্ধ হয় (পুরো পেজ/অ্যাপ থেকে বের না হয়ে যায়) */
 let overlayStack = [];
+let suppressNextHistoryPush = false;
 function pushOverlay(closeFn){
   overlayStack.push(closeFn);
+  if(suppressNextHistoryPush){ suppressNextHistoryPush = false; return; }
   safeHistory(()=>history.pushState({overlay:true}, '', location.hash));
 }
 function popOverlayHistory(closeFn){
   // ইউজার নিজে (X/বাতিল/ব্যাকড্রপ ক্লিক করে) ওভারলে বন্ধ করলে, হিস্ট্রিতে যোগ করা এন্ট্রিটাও সরিয়ে দেওয়া হয়
   const idx = overlayStack.lastIndexOf(closeFn);
   if(idx !== -1){ overlayStack.splice(idx,1); safeHistory(()=>history.back()); }
+}
+// ড্রয়ার বন্ধ করে সাথে সাথেই আরেকটা মোডাল (ফন্ট/এডিট/ডিলিট) খোলার সময় এটা ব্যবহার হয়।
+// শুধু history.back() না করে ড্রয়ারকে স্ট্যাক থেকে সরিয়ে next push-টা history-তে না জমিয়ে
+// সরাসরি বদলে দেওয়া হয় — নাহলে পরপর history.back() আর pushState একসাথে ঘটলে
+// নতুন খোলা মোডালটাই ভুলবশত সাথে সাথে বন্ধ হয়ে যায়।
+function closeReaderDrawerForSwap(){
+  document.getElementById('readerDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+  const idx = overlayStack.lastIndexOf(closeReaderDrawer);
+  if(idx !== -1) overlayStack.splice(idx,1);
+  suppressNextHistoryPush = true;
 }
 
 function goBackInApp(){
