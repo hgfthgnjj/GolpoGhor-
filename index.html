@@ -588,7 +588,7 @@
       <button class="icon-btn danger" id="deleteCatBtn" onclick="confirmDeleteCategory()">🗑</button>
     </div>
     <div class="toc-wrap" id="tocWrap"></div>
-    <button class="category-fab" id="categoryFab" onclick="openAddStory()" title="নতুন গল্প যুক্ত করুন">
+    <button class="category-fab" id="categoryFab" onclick="handleCategoryFabClick()" title="নতুন গল্প যুক্ত করুন">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
   </div>
@@ -637,6 +637,7 @@
 </div>
 
 <input type="file" id="epubFileInput" accept=".epub" style="display:none" onchange="handleEpubFile(event)">
+<input type="file" id="docxFileInput" accept=".docx" style="display:none" onchange="handleDocxFile(event)">
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
   <div class="modal-card" id="modalCard"></div>
 </div>
@@ -719,6 +720,7 @@
 
 <!-- ===== Firebase (ক্লাউড স্টোরেজ + অফলাইন সিঙ্ক) ===== -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
@@ -1672,6 +1674,22 @@ async function deleteCategory(){
   goBackInApp();
 }
 
+// ক্যাটাগরির "+" বাটনে চাপ দিলে — সিরিজ হলে সরাসরি নতুন পর্ব যোগের ফর্ম, নাহলে (ছোট গল্প) মেনু দেখানো হয়
+function handleCategoryFabClick(){
+  const cat = getCat();
+  if(!cat){ showToast('আগে একটা ক্যাটাগরি/সিরিজে ঢুকুন'); return; }
+  if(cat.type === 'series'){ openAddStory(); return; }
+  openShortStoryAddMenu();
+}
+function openShortStoryAddMenu(){
+  openModal(`
+    <h3 class="modal-title">কী যোগ করতে চান?</h3>
+    <div class="btn-row" style="flex-direction:column;gap:12px;">
+      <button class="btn btn-primary" style="width:100%;" onclick="closeModal();openAddStory()">＋ নতুন গল্প</button>
+      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerDocxUpload()">📄 Word (.docx) থেকে টাইটেল অনুযায়ী গল্প যোগ করুন</button>
+    </div>
+  `);
+}
 function openAddStory(){
   const cat = getCat();
   if(!cat){ showToast('আগে একটা ক্যাটাগরি/সিরিজে ঢুকুন'); return; }
@@ -2522,6 +2540,75 @@ function openSeriesAddMenu(){
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerEpubUpload()">📕 EPUB থেকে বই যোগ করুন</button>
     </div>
   `);
+}
+
+/* ── Word (.docx) আপলোড — Heading Style (Heading 1/2) অনুযায়ী একাধিক পর্বে ভাগ করে যোগ করা ── */
+function triggerDocxUpload(){
+  if(typeof mammoth === 'undefined'){ showToast('Word টুল লোড হয়নি, ইন্টারনেট চেক করে আবার চেষ্টা করুন'); return; }
+  const inp = document.getElementById('docxFileInput');
+  if(!inp) return;
+  inp.value = '';
+  inp.click();
+}
+
+// mammoth-এর HTML আউটপুট থেকে h1/h2 (Heading 1/2) দেখে দেখে একাধিক পর্বে ভাগ করা
+function splitDocxIntoChapters(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const nodes = Array.from(doc.body.children);
+  const chapters = [];
+  let current = null;
+  nodes.forEach(node=>{
+    const tag = node.tagName ? node.tagName.toLowerCase() : '';
+    if(tag === 'h1' || tag === 'h2'){
+      const headingText = node.textContent.replace(/\s+/g,' ').trim();
+      current = { title: headingText, parts: [] };
+      chapters.push(current);
+    } else {
+      const t = node.textContent.replace(/[ \t]+/g,' ').trim();
+      if(!t) return;
+      if(!current){ current = { title: '', parts: [] }; chapters.push(current); }
+      current.parts.push(t);
+    }
+  });
+  return chapters
+    .map(ch => ({ title: ch.title, body: ch.parts.join('\n\n').trim() }))
+    .filter(ch => ch.body || ch.title);
+}
+
+async function handleDocxFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!/\.docx$/i.test(file.name)){ showToast('একটা .docx ফাইল বাছাই করুন (পুরনো .doc সাপোর্ট করে না)'); return; }
+  const cat = getCat();
+  if(!cat){ showToast('আগে একটা ক্যাটাগরিতে ঢুকুন'); return; }
+  showToast('ফাইল পড়া হচ্ছে, একটু অপেক্ষা করুন…');
+  try{
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.convertToHtml({ arrayBuffer }, {
+      styleMap: ["p[style-name='Heading 1'] => h1:fresh", "p[style-name='Heading 2'] => h2:fresh"]
+    });
+    const chapters = splitDocxIntoChapters(result.value || '');
+    if(!chapters.length){ showToast('ফাইলের ভেতরে কোনো লেখা পাওয়া যায়নি'); return; }
+
+    // একটামাত্র অংশ থাকলে (কোনো Heading স্টাইল পাওয়া যায়নি) পুরো লেখাটাই একটা গল্প হিসেবে, ফাইলের নাম টাইটেল হিসেবে ব্যবহার হবে
+    const useHeadingTitles = chapters.length > 1 && chapters.some(ch => ch.title);
+    const fallbackTitle = file.name.replace(/\.docx$/i,'');
+    let addedCount = 0;
+    chapters.forEach((ch, idx)=>{
+      if(!ch.body) return;
+      const title = (useHeadingTitles && ch.title) ? ch.title : (chapters.length > 1 ? `${fallbackTitle} ${toBengaliNum(idx+1)}` : fallbackTitle);
+      cat.stories.push({ id: uid(), title, body: ch.body, readtime: estimateReadtime(ch.body) });
+      addedCount++;
+    });
+    if(!addedCount){ showToast('ফাইলের ভেতরে কোনো লেখা পাওয়া যায়নি'); return; }
+
+    await saveData();
+    showToast(`${toBengaliNum(addedCount)} টি গল্প যোগ হয়েছে`);
+    renderToc();
+  }catch(err){
+    console.log('docx parse error', err);
+    showToast('ফাইলটা পড়া যায়নি। ফাইলটা ক্ষতিগ্রস্ত হতে পারে।');
+  }
 }
 
 /* ── EPUB আপলোড (বইকে সিরিজ/পর্ব হিসেবে যোগ করা) ── */
