@@ -808,6 +808,10 @@ const PALETTE = [
 ];
 const STORAGE_KEY = 'golpoghor-data';
 const DARK_KEY = 'golpoghor-darkmode';
+// রিলোড দিলে অ্যাপ যেন সবসময় হোম পেজে ফিরে না গিয়ে ঠিক যেখানে ছিল (গল্প/ক্যাটাগরি) সেখানেই ফিরে আসে —
+// sessionStorage ব্যবহার করা হয় যাতে ট্যাব/অ্যাপ পুরোপুরি বন্ধ করলে (নতুন সেশন) স্বাভাবিকভাবে হোম থেকেই শুরু হয়,
+// কিন্তু শুধু রিলোড/রিফ্রেশ করলে বর্তমান স্ক্রিনটাই ফিরে আসে
+const NAV_STATE_KEY = 'golpoghor-nav-state';
 let DATA = { categories: [], favorites: [], lastRead: null, version: 0 };
 let currentCatId = null;
 let currentHomeType = false;
@@ -817,6 +821,54 @@ let headerHideTimer = null;
 let scrollSaveTimer = null;
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+// localStorage-এ পুরো DATA (গল্পের আসল লেখাসহ) সেভ করা হতো, কিন্তু ব্রাউজারে localStorage-এর
+// সাইজ সীমা সাধারণত মাত্র ৫-১০ MB। বড় লাইব্রেরি বা বাল্ক ইম্পোর্টে (যেমন Blogger এক্সপোর্ট) এটা
+// সহজেই ছাড়িয়ে যায় — তখন localStorage.setItem() নিঃশব্দে ফেইল করে, আর পরের বার অ্যাপ
+// রিলোড করলে (যেটা localStorage থেকেই ডেটা পড়ে) নতুন যোগ করা গল্পগুলো "হারিয়ে" যায়।
+// তাই localStorage-এ শুধু হালকা মেটাডেটা (টাইটেল, আইডি ইত্যাদি) রাখা হয় — গল্পের আসল লেখা (body)
+// রাখা হয় না। আসল লেখা ক্লাউডে (Firestore, প্রতিটা গল্প আলাদা ডকুমেন্টে) থাকে, আর Firestore-এর
+// নিজস্ব অফলাইন ক্যাশ (IndexedDB) ব্যবহার করে — তার সাইজ সীমা localStorage-এর চেয়ে বহুগুণ বেশি,
+// তাই অফলাইনেও বড় লাইব্রেরি নির্ভরযোগ্যভাবে কাজ করবে।
+function getLocalStorageSafeData(){
+  return {
+    categories: (DATA.categories || []).map(function(c){
+      return {
+        id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null,
+        stories: (c.stories || []).map(function(s){
+          return { id: s.id, title: s.title, readtime: s.readtime, epNum: (s.epNum!=null ? s.epNum : undefined) };
+        })
+      };
+    }),
+    favorites: DATA.favorites || [],
+    lastRead: DATA.lastRead === undefined ? null : DATA.lastRead,
+    version: DATA.version || 0
+  };
+}
+// localStorage থেকে পড়ার সময়, উপরের মতো "হালকা" ভার্সন থেকে DATA রিস্টোর করলে গল্পের
+// body খালি থাকবে — সেটা ঠিক আছে, কারণ কিছুক্ষণের মধ্যেই ক্লাউড থেকে পূর্ণ ডেটা এসে পূরণ করে দেবে।
+// কিন্তু যদি কোনো কারণে ক্লাউড থেকে না আসে, তাহলে অন্তত title/readtime দেখাতে পারবে যাতে
+// অ্যাপ পুরোপুরি ভেঙে না পড়ে।
+//
+// সেভ করার কৌশল: আগে পুরো DATA (গল্পের লেখাসহ) লোকালে রাখার চেষ্টা করা হয় — এতে অফলাইনে
+// এডিট করা গল্পও নিরাপদ থাকে (ক্লাউডে সিঙ্ক না হওয়া পর্যন্ত)। শুধু লাইব্রেরি বড় হয়ে গিয়ে
+// localStorage-এর কোটা শেষ হয়ে গেলেই (QuotaExceededError) হালকা মেটাডেটা-ভার্সনে ফলব্যাক করা হয়,
+// যাতে অন্তত অ্যাপ ভেঙে না পড়ে এবং টাইটেল/তালিকা ঠিক থাকে (গল্পের লেখা তখন শুধু ক্লাউড থেকেই আসবে)।
+function persistDataToLocalStorage(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+    return true;
+  }catch(e){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(getLocalStorageSafeData()));
+      console.log('localStorage কোটা শেষ — শুধু হালকা মেটাডেটা সেভ হয়েছে, গল্পের লেখা ক্লাউড থেকে আসবে');
+      return true;
+    }catch(e2){
+      console.log('localStorage সম্পূর্ণ পূর্ণ, কিছুই সেভ করা যায়নি', e2);
+      return false;
+    }
+  }
+}
 
 /* ---------- STORAGE (লোকাল + ক্লাউড) ---------- */
 
@@ -840,6 +892,17 @@ function buildCloudDataFromMeta(metaRaw, storiesMap){
 
 function countStories(d){
   return (d.categories||[]).reduce(function(n,c){ return n + (c.stories ? c.stories.length : 0); }, 0);
+}
+// লোকাল DATA-তে গল্পের আসল লেখা (body) আছে কিনা যাচাই করা — না থাকলে বুঝতে হবে এটা
+// localStorage কোটা শেষ হয়ে যাওয়ায় সেভ হওয়া "হালকা" মেটাডেটা-ভার্সন, তাই এটা ক্লাউডে
+// পুশ করা নিরাপদ না (নাহলে আসল গল্পের লেখা মুছে যাবে)
+function localDataHasFullBodies(){
+  for(const c of (DATA.categories||[])){
+    for(const s of (c.stories||[])){
+      if(s.body === undefined) return false;
+    }
+  }
+  return true;
 }
 
 // DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
@@ -951,6 +1014,7 @@ async function loadData(){
   if(!DATA.favorites) DATA.favorites = [];
   if(DATA.lastRead === undefined) DATA.lastRead = null;
   renderShelf();
+  restoreNavSessionState();
 
   // প্রথমে একবার ক্লাউডের সাথে মিলিয়ে নেওয়া — পুরনো ফরম্যাটে ডেটা থাকলে নতুন ফরম্যাটে মাইগ্রেট করা হবে
   try{
@@ -974,20 +1038,30 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+        persistDataToLocalStorage();
         renderShelf();
+        restoreNavSessionState();
       } else {
         console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
       }
       // পুরনো ফরম্যাট (গল্প সরাসরি ক্যাটাগরির ভেতরে) হলে নতুন ফরম্যাটে মাইগ্রেট করে দেওয়া,
-      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা
+      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা — কিন্তু শুধু তখনই, যখন লোকাল ডেটায়
+      // গল্পের আসল লেখা (body) সত্যিই আছে। localStorage কোটা শেষ হয়ে গিয়ে যদি শুধু হালকা
+      // মেটাডেটা (title/id, body ছাড়া) লোড হয়ে থাকে, তাহলে ভুলবশত সেই ফাঁকা কনটেন্ট
+      // ক্লাউডে পুশ করে আসল গল্প মুছে ফেলার ঝুঁকি এড়ানো হয়
       const isLegacyFormat = (metaRaw.categories || []).some(function(cm){ return Array.isArray(cm.stories); });
-      if(isLegacyFormat || cloudCount < localCount){
-        pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
+      if((isLegacyFormat || cloudCount < localCount)){
+        if(localDataHasFullBodies()){
+          pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
+        } else {
+          console.log('লোকাল ডেটায় গল্পের লেখা নেই (শুধু হালকা ক্যাশ) — নিরাপত্তার জন্য ক্লাউডে পুশ করা হচ্ছে না');
+        }
       }
     } else {
-      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড
-      pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
+      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড (তবে শুধু যদি লোকালে আসল লেখা থাকে)
+      if(localDataHasFullBodies()){
+        pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
+      }
     }
   }catch(e){ console.log('initial cloud sync failed', e); }
 
@@ -1007,7 +1081,7 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+        persistDataToLocalStorage();
         renderShelf();
       }
     }
@@ -1027,8 +1101,8 @@ async function loadData(){
 }
 async function saveData(changedIds, deletedIds){
   DATA.version = (DATA.version || 0) + 1;
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
-  catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
+  const savedOk = persistDataToLocalStorage();
+  if(!savedOk) showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন');
   try{
     await pushAllToCloud(changedIds, deletedIds);
   }catch(e){
@@ -1042,7 +1116,7 @@ async function saveData(changedIds, deletedIds){
 // বারবার চালালে অ্যাপ স্লো হয়ে যায় এবং অকারণে অনেক বেশি Firestore রিড/রাইট খরচ হয়। তাই শুধু
 // ছোট্ট lastRead তথ্যটুকু META_DOC-এ merge করে আপডেট করা হয়, বাকি গল্পগুলো স্পর্শও করা হয় না।
 async function saveReadingState(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
+  persistDataToLocalStorage();
   try{
     await META_DOC.set({ data: { lastRead: DATA.lastRead }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
   }catch(e){ console.log('reading state cloud save failed (offline or error)', e); }
@@ -1155,6 +1229,58 @@ function setView(id, direction){
     else { el.classList.remove('active'); el.classList.add(direction==='back' ? 'offscreen-right' : 'offscreen-left'); }
   });
   setTimeout(()=>{ ['home','category','story','wishlist','typeList'].forEach(v=>{ const el=document.getElementById(v); if(el && v!==id) el.classList.add('hidden-view'); }); }, 520);
+  saveNavSessionState(id);
+}
+function saveNavSessionState(viewId){
+  try{
+    sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({ view: viewId, catId: currentCatId, storyId: currentStoryId }));
+  }catch(e){}
+}
+let navRestoreDone = false;
+function restoreNavSessionState(){
+  if(navRestoreDone) return; // একবার সফলভাবে হয়ে গেলে আবার চালানোর দরকার নেই (নাহলে হিস্ট্রি এন্ট্রি ডুপ্লিকেট হবে)
+  let state = null;
+  try{ state = JSON.parse(sessionStorage.getItem(NAV_STATE_KEY) || 'null'); }catch(e){ return; }
+  if(!state || !state.view || state.view === 'home') return;
+
+  if(state.view === 'category'){
+    if(state.catId === '__fav__'){
+      currentCatId = '__fav__';
+      renderFavoritesToc();
+      safeHistory(()=>history.pushState({view:'category', catId:'__fav__'}, '', '#favorites'));
+      setView('category','forward');
+    } else if(state.catId === '__all__'){
+      currentCatId = '__all__';
+      renderAllStoriesToc();
+      safeHistory(()=>history.pushState({view:'category', catId:'__all__'}, '', '#all'));
+      setView('category','forward');
+    } else {
+      const cat = DATA.categories.find(c=>c.id===state.catId);
+      if(!cat) return; // ক্যাটাগরিটা আর নেই — নিরাপদে হোমেই থাকা
+      currentCatId = state.catId;
+      renderToc();
+      safeHistory(()=>history.pushState({view:'category', catId:state.catId}, '', '#cat'));
+      setView('category','forward');
+    }
+  } else if(state.view === 'story'){
+    const cat = DATA.categories.find(c=>c.id===state.catId);
+    const story = cat && cat.stories.find(s=>s.id===state.storyId);
+    if(!cat || !story) return; // গল্প/ক্যাটাগরি ডিলিট হয়ে থাকলে হোমেই থাকা নিরাপদ
+    if(story.body === undefined) return;
+    // localStorage-এ শুধু হালকা মেটাডেটা (title/id) থাকে, গল্পের আসল লেখা (body) থাকে না —
+    // তাই প্রথমবার (ক্লাউড সিঙ্কের আগে) body না থাকলে এখনই রেন্ডার না করে অপেক্ষা করা হয়;
+    // ক্লাউড থেকে পূর্ণ ডেটা এলে loadData() আবার এই ফাংশনটা কল করবে, তখন সফলভাবে রিস্টোর হবে
+    currentCatId = state.catId;
+    safeHistory(()=>history.pushState({view:'story', catId:state.catId, storyId:state.storyId}, '', '#story'));
+    setView('story','forward');
+    const savedScroll = (DATA.lastRead && DATA.lastRead.storyId === state.storyId) ? (DATA.lastRead.scrollY || 0) : 0;
+    renderStory(state.storyId, savedScroll);
+  } else if(state.view === 'wishlist'){
+    renderWishlistToc();
+    safeHistory(()=>history.pushState({view:'wishlist'}, '', '#wishlist'));
+    setView('wishlist','forward');
+  }
+  navRestoreDone = true;
 }
 
 /* ---------- HISTORY / BACK BUTTON HANDLING ---------- */
