@@ -2726,6 +2726,7 @@ function jumpToParaSection(idx){
 
 /* ── Word Count ── */
 function getWordCount(text){
+  if(!text) return 0; // body না থাকলে (এখনও সিঙ্ক না হওয়া বড় লাইব্রেরির ক্ষেত্রে) ক্র্যাশ না করে ০ দেখানো হয়
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
