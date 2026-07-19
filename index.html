@@ -1704,6 +1704,36 @@ function renderStory(id, scrollTo){
   document.getElementById('storyTopTitle').textContent = (cat.type==='series' && s.epNum!=null) ? `পর্ব ${toBengaliNum(s.epNum)}` : s.title;
   document.getElementById('storyMeta').textContent = `পড়ার সময় ${s.readtime}`;
 
+  // বড় লাইব্রেরিতে localStorage কোটার কারণে গল্পের লেখা (body) সাময়িকভাবে লোকালে না-ও থাকতে পারে —
+  // ক্লাউড থেকে সিঙ্ক হয়ে আসা পর্যন্ত এখানে ক্র্যাশ না করে একটা লোডিং বার্তা দেখানো হয়, আর
+  // অল্প কিছুক্ষণ পরপর আবার চেষ্টা করা হয় (ক্লাউড ডেটা এসে গেলেই স্বয়ংক্রিয়ভাবে আসল লেখা দেখাবে)
+  if(s.body === undefined){
+    document.getElementById('storyBody').innerHTML = `
+      <div style="text-align:center;padding:60px 20px;color:var(--slate);">
+        <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড হচ্ছে…</p>
+        <p style="font-size:13px;opacity:.7;">একটু অপেক্ষা করুন, ইন্টারনেট সংযোগ থাকলে এটা নিজে থেকেই চলে আসবে।</p>
+      </div>`;
+    let tries = 0;
+    const retry = () => {
+      tries++;
+      const freshCat = getCat();
+      const freshStory = freshCat && freshCat.stories.find(x=>x.id===id);
+      if(currentStoryId !== id) return; // ইতিমধ্যে অন্য গল্পে চলে গেছে, রিট্রাই বন্ধ
+      if(freshStory && freshStory.body !== undefined){
+        renderStory(id, scrollTo);
+      } else if(tries < 15){
+        setTimeout(retry, 800);
+      } else {
+        document.getElementById('storyBody').innerHTML = `
+          <div style="text-align:center;padding:60px 20px;color:var(--slate);">
+            <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।</p>
+          </div>`;
+      }
+    };
+    setTimeout(retry, 800);
+    return;
+  }
+
   /* ── Split into ~200-word numbered sections ── */
   const rawParas = s.body.split(/\n+/).filter(p => p.trim());
   const WORDS_PER_SECTION = 800;
@@ -2178,6 +2208,7 @@ async function saveNewStory(){
 function openEditStory(){
   const s = getStory();
   if(!s) return;
+  if(s.body === undefined){ showToast('গল্পের লেখা এখনও ক্লাউড থেকে লোড হচ্ছে, একটু পর আবার চেষ্টা করুন'); return; }
   const cat = getCat();
   const isSeries = cat && cat.type === 'series';
   openModal(`
@@ -2877,6 +2908,7 @@ function jumpToParaSection(idx){
 
 /* ── Word Count ── */
 function getWordCount(text){
+  if(!text) return 0; // body এখনও ক্লাউড থেকে লোড না হয়ে থাকলে (undefined) ক্র্যাশ না করে ০ দেখানো হয়
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
