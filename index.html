@@ -1016,10 +1016,36 @@ async function loadData(){
   renderShelf();
   restoreNavSessionState();
 
+  // ক্লাউড (Firestore)-এর নিজস্ব অফলাইন ক্যাশ IndexedDB-তে জমা থাকে, যার সাইজ সীমা localStorage-এর
+  // চেয়ে বহুগুণ বড় (সাধারণত কয়েকশ MB থেকে কয়েক GB, ডিভাইসভেদে)। তাই localStorage-এ ছোট/হালকা
+  // মেটাডেটা রাখা হলেও, গল্পের আসল লেখাসহ পূর্ণ ডেটা এই ক্যাশ থেকে প্রায় সাথে সাথেই (নেটওয়ার্ক ছাড়াই)
+  // পাওয়া সম্ভব — এতে আগের মতো "স্মুথ" অভিজ্ঞতা পাওয়া যায়, আবার বড় লাইব্রেরিতেও কোটার সমস্যা হয় না।
+  try{
+    const [cachedMetaDoc, cachedStoriesSnap] = await Promise.all([
+      META_DOC.get({ source: 'cache' }).catch(function(){ return null; }),
+      STORIES_COL.get({ source: 'cache' }).catch(function(){ return null; })
+    ]);
+    if(cachedMetaDoc && cachedMetaDoc.exists && cachedMetaDoc.data() && cachedMetaDoc.data().data){
+      const cachedStoriesMap = {};
+      if(cachedStoriesSnap) cachedStoriesSnap.forEach(function(d){ cachedStoriesMap[d.id] = d.data(); });
+      const cachedData = buildCloudDataFromMeta(cachedMetaDoc.data().data, cachedStoriesMap);
+      const localVersion = DATA.version || 0;
+      const cachedVersion = cachedData.version || 0;
+      const localCount = countStories(DATA);
+      const cachedCount = countStories(cachedData);
+      if(cachedVersion > localVersion || (cachedVersion === localVersion && cachedCount >= localCount)){
+        DATA = cachedData;
+        if(!DATA.favorites) DATA.favorites = [];
+        if(DATA.lastRead === undefined) DATA.lastRead = null;
+        renderShelf();
+        restoreNavSessionState();
+      }
+    }
+  }catch(e){ console.log('cache-first hydrate skipped', e); }
+
   // প্রথমে একবার ক্লাউডের সাথে মিলিয়ে নেওয়া — পুরনো ফরম্যাটে ডেটা থাকলে নতুন ফরম্যাটে মাইগ্রেট করা হবে
   try{
-    const metaDoc = await META_DOC.get();
-    const storiesSnap = await STORIES_COL.get();
+    const [metaDoc, storiesSnap] = await Promise.all([ META_DOC.get(), STORIES_COL.get() ]);
     const storiesMap = {};
     storiesSnap.forEach(function(d){ storiesMap[d.id] = d.data(); });
 
