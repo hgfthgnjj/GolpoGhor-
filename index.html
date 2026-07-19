@@ -844,7 +844,24 @@ function countStories(d){
 
 // DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
 // এবং ডিলিট হওয়া গল্প থাকলে সেগুলোও ক্লাউড থেকে সরিয়ে দেওয়া
+// এই ফ্ল্যাগটা যতক্ষণ ধনাত্মক থাকে, ততক্ষণ ক্লাউড থেকে আসা রিয়েল-টাইম আপডেট উপেক্ষা করা হয়।
+// কারণ: META_DOC আর STORIES_COL — এই দুটো আলাদা Firestore রাইট, তাই একসাথে (atomically) হয় না।
+// মাঝখানে (META_DOC লেখা হয়ে গেছে, কিন্তু নতুন গল্পের ডকুমেন্ট তখনও লেখা হয়নি) একটা মুহূর্তে
+// রিয়েল-টাইম লিসেনার যদি স্ন্যাপশট পড়ে ফেলে, তাহলে সেটা মনে করবে নতুন গল্পটা "নেই" —
+// আর সেই ভুল/অসম্পূর্ণ তথ্যটাই লোকালে সেভ করে ফেলবে, ফলে সদ্য আপলোড করা গল্প উধাও হয়ে যায়।
+// তাই নিজের সেভ চলাকালীন (এবং শেষ হওয়ার পরও কিছুক্ষণ) এই ইকো-আপডেটগুলো উপেক্ষা করা হয়।
+let ownSaveDepth = 0;
 async function pushAllToCloud(changedIds, deletedIds){
+  ownSaveDepth++;
+  try{
+    await pushAllToCloudInner(changedIds, deletedIds);
+  } finally {
+    // সেভ শেষ হওয়ার পরও সামান্য সময় (৮০০ms) গ্রেস-পিরিয়ড রাখা হয়, যাতে দেরিতে আসা
+    // কোনো ইকো স্ন্যাপশটও ভুলবশত প্রসেস না হয়
+    setTimeout(function(){ ownSaveDepth = Math.max(0, ownSaveDepth-1); }, 800);
+  }
+}
+async function pushAllToCloudInner(changedIds, deletedIds){
   const metaData = {
     categories: DATA.categories.map(function(c){
       return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null, storyIds: c.stories.map(function(s){ return s.id; }) };
@@ -853,7 +870,6 @@ async function pushAllToCloud(changedIds, deletedIds){
     lastRead: DATA.lastRead,
     version: DATA.version || 0
   };
-  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
   // দ্রুত পথ: শুধু যে গল্পগুলো আসলে যোগ/এডিট/ডিলিট হয়েছে সেগুলোই লেখা হয় —
   // পুরো লাইব্রেরি আবার স্ক্যান/রি-রাইট করার দরকার হয় না। একটা গল্প যোগ করলে
@@ -870,6 +886,9 @@ async function pushAllToCloud(changedIds, deletedIds){
     });
     (deletedIds || []).forEach(function(id){ ops.push({ type:'delete', id }); });
 
+    // আগে গল্পের ডকুমেন্টগুলো লেখা হয় (batch), তারপর সবশেষে META_DOC আপডেট হয় —
+    // এই ক্রম ঠিক রাখা জরুরি, নাহলে META_DOC-এ নতুন গল্পের রেফারেন্স চলে যাবে অথচ
+    // গল্পের আসল ডকুমেন্টটা তখনও ক্লাউডে তৈরিই হয়নি
     for(let i=0; i<ops.length; i+=400){
       const batch = db.batch();
       ops.slice(i, i+400).forEach(function(op){
@@ -882,6 +901,7 @@ async function pushAllToCloud(changedIds, deletedIds){
       });
       await batch.commit();
     }
+    await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     return;
   }
 
@@ -906,6 +926,7 @@ async function pushAllToCloud(changedIds, deletedIds){
   const ops = allStories.map(function(s){ return { type: 'set', s: s }; })
     .concat(staleIds.map(function(id){ return { type: 'delete', id: id }; }));
 
+  // এখানেও একই কারণে আগে গল্পগুলো লেখা হয়, META_DOC সবার শেষে
   for(let i=0; i<ops.length; i+=400){
     const batch = db.batch();
     ops.slice(i, i+400).forEach(function(op){
@@ -918,6 +939,7 @@ async function pushAllToCloud(changedIds, deletedIds){
     });
     await batch.commit();
   }
+  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 }
 
 async function loadData(){
@@ -974,6 +996,7 @@ async function loadData(){
     let lastMeta = null, lastStories = null;
     function applyIfCloudNewer(){
       if(lastMeta === null || lastStories === null) return;
+      if(ownSaveDepth > 0) return; // নিজের সেভ চলাকালীন/সদ্য শেষ হওয়া ইকো আপডেট উপেক্ষা করা হয়
       const cloudData = buildCloudDataFromMeta(lastMeta, lastStories);
       const localVersion = DATA.version || 0;
       const cloudVersion = cloudData.version || 0;
