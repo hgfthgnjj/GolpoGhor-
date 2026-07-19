@@ -681,7 +681,6 @@
 
 <input type="file" id="epubFileInput" accept=".epub" style="display:none" onchange="handleEpubFile(event)">
 <input type="file" id="docxFileInput" accept=".docx" style="display:none" onchange="handleDocxFile(event)">
-<input type="file" id="bloggerFileInput" accept=".xml" style="display:none" onchange="handleBloggerFile(event)">
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeModal()">
   <div class="modal-card" id="modalCard"></div>
 </div>
@@ -808,10 +807,6 @@ const PALETTE = [
 ];
 const STORAGE_KEY = 'golpoghor-data';
 const DARK_KEY = 'golpoghor-darkmode';
-// রিলোড দিলে অ্যাপ যেন সবসময় হোম পেজে ফিরে না গিয়ে ঠিক যেখানে ছিল (গল্প/ক্যাটাগরি) সেখানেই ফিরে আসে —
-// sessionStorage ব্যবহার করা হয় যাতে ট্যাব/অ্যাপ পুরোপুরি বন্ধ করলে (নতুন সেশন) স্বাভাবিকভাবে হোম থেকেই শুরু হয়,
-// কিন্তু শুধু রিলোড/রিফ্রেশ করলে বর্তমান স্ক্রিনটাই ফিরে আসে
-const NAV_STATE_KEY = 'golpoghor-nav-state';
 let DATA = { categories: [], favorites: [], lastRead: null, version: 0 };
 let currentCatId = null;
 let currentHomeType = false;
@@ -821,54 +816,6 @@ let headerHideTimer = null;
 let scrollSaveTimer = null;
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-
-// localStorage-এ পুরো DATA (গল্পের আসল লেখাসহ) সেভ করা হতো, কিন্তু ব্রাউজারে localStorage-এর
-// সাইজ সীমা সাধারণত মাত্র ৫-১০ MB। বড় লাইব্রেরি বা বাল্ক ইম্পোর্টে (যেমন Blogger এক্সপোর্ট) এটা
-// সহজেই ছাড়িয়ে যায় — তখন localStorage.setItem() নিঃশব্দে ফেইল করে, আর পরের বার অ্যাপ
-// রিলোড করলে (যেটা localStorage থেকেই ডেটা পড়ে) নতুন যোগ করা গল্পগুলো "হারিয়ে" যায়।
-// তাই localStorage-এ শুধু হালকা মেটাডেটা (টাইটেল, আইডি ইত্যাদি) রাখা হয় — গল্পের আসল লেখা (body)
-// রাখা হয় না। আসল লেখা ক্লাউডে (Firestore, প্রতিটা গল্প আলাদা ডকুমেন্টে) থাকে, আর Firestore-এর
-// নিজস্ব অফলাইন ক্যাশ (IndexedDB) ব্যবহার করে — তার সাইজ সীমা localStorage-এর চেয়ে বহুগুণ বেশি,
-// তাই অফলাইনেও বড় লাইব্রেরি নির্ভরযোগ্যভাবে কাজ করবে।
-function getLocalStorageSafeData(){
-  return {
-    categories: (DATA.categories || []).map(function(c){
-      return {
-        id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null,
-        stories: (c.stories || []).map(function(s){
-          return { id: s.id, title: s.title, readtime: s.readtime, epNum: (s.epNum!=null ? s.epNum : undefined) };
-        })
-      };
-    }),
-    favorites: DATA.favorites || [],
-    lastRead: DATA.lastRead === undefined ? null : DATA.lastRead,
-    version: DATA.version || 0
-  };
-}
-// localStorage থেকে পড়ার সময়, উপরের মতো "হালকা" ভার্সন থেকে DATA রিস্টোর করলে গল্পের
-// body খালি থাকবে — সেটা ঠিক আছে, কারণ কিছুক্ষণের মধ্যেই ক্লাউড থেকে পূর্ণ ডেটা এসে পূরণ করে দেবে।
-// কিন্তু যদি কোনো কারণে ক্লাউড থেকে না আসে, তাহলে অন্তত title/readtime দেখাতে পারবে যাতে
-// অ্যাপ পুরোপুরি ভেঙে না পড়ে।
-//
-// সেভ করার কৌশল: আগে পুরো DATA (গল্পের লেখাসহ) লোকালে রাখার চেষ্টা করা হয় — এতে অফলাইনে
-// এডিট করা গল্পও নিরাপদ থাকে (ক্লাউডে সিঙ্ক না হওয়া পর্যন্ত)। শুধু লাইব্রেরি বড় হয়ে গিয়ে
-// localStorage-এর কোটা শেষ হয়ে গেলেই (QuotaExceededError) হালকা মেটাডেটা-ভার্সনে ফলব্যাক করা হয়,
-// যাতে অন্তত অ্যাপ ভেঙে না পড়ে এবং টাইটেল/তালিকা ঠিক থাকে (গল্পের লেখা তখন শুধু ক্লাউড থেকেই আসবে)।
-function persistDataToLocalStorage(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
-    return true;
-  }catch(e){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(getLocalStorageSafeData()));
-      console.log('localStorage কোটা শেষ — শুধু হালকা মেটাডেটা সেভ হয়েছে, গল্পের লেখা ক্লাউড থেকে আসবে');
-      return true;
-    }catch(e2){
-      console.log('localStorage সম্পূর্ণ পূর্ণ, কিছুই সেভ করা যায়নি', e2);
-      return false;
-    }
-  }
-}
 
 /* ---------- STORAGE (লোকাল + ক্লাউড) ---------- */
 
@@ -893,38 +840,10 @@ function buildCloudDataFromMeta(metaRaw, storiesMap){
 function countStories(d){
   return (d.categories||[]).reduce(function(n,c){ return n + (c.stories ? c.stories.length : 0); }, 0);
 }
-// লোকাল DATA-তে গল্পের আসল লেখা (body) আছে কিনা যাচাই করা — না থাকলে বুঝতে হবে এটা
-// localStorage কোটা শেষ হয়ে যাওয়ায় সেভ হওয়া "হালকা" মেটাডেটা-ভার্সন, তাই এটা ক্লাউডে
-// পুশ করা নিরাপদ না (নাহলে আসল গল্পের লেখা মুছে যাবে)
-function localDataHasFullBodies(){
-  for(const c of (DATA.categories||[])){
-    for(const s of (c.stories||[])){
-      if(s.body === undefined) return false;
-    }
-  }
-  return true;
-}
 
 // DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
 // এবং ডিলিট হওয়া গল্প থাকলে সেগুলোও ক্লাউড থেকে সরিয়ে দেওয়া
-// এই ফ্ল্যাগটা যতক্ষণ ধনাত্মক থাকে, ততক্ষণ ক্লাউড থেকে আসা রিয়েল-টাইম আপডেট উপেক্ষা করা হয়।
-// কারণ: META_DOC আর STORIES_COL — এই দুটো আলাদা Firestore রাইট, তাই একসাথে (atomically) হয় না।
-// মাঝখানে (META_DOC লেখা হয়ে গেছে, কিন্তু নতুন গল্পের ডকুমেন্ট তখনও লেখা হয়নি) একটা মুহূর্তে
-// রিয়েল-টাইম লিসেনার যদি স্ন্যাপশট পড়ে ফেলে, তাহলে সেটা মনে করবে নতুন গল্পটা "নেই" —
-// আর সেই ভুল/অসম্পূর্ণ তথ্যটাই লোকালে সেভ করে ফেলবে, ফলে সদ্য আপলোড করা গল্প উধাও হয়ে যায়।
-// তাই নিজের সেভ চলাকালীন (এবং শেষ হওয়ার পরও কিছুক্ষণ) এই ইকো-আপডেটগুলো উপেক্ষা করা হয়।
-let ownSaveDepth = 0;
 async function pushAllToCloud(changedIds, deletedIds){
-  ownSaveDepth++;
-  try{
-    await pushAllToCloudInner(changedIds, deletedIds);
-  } finally {
-    // সেভ শেষ হওয়ার পরও সামান্য সময় (৮০০ms) গ্রেস-পিরিয়ড রাখা হয়, যাতে দেরিতে আসা
-    // কোনো ইকো স্ন্যাপশটও ভুলবশত প্রসেস না হয়
-    setTimeout(function(){ ownSaveDepth = Math.max(0, ownSaveDepth-1); }, 800);
-  }
-}
-async function pushAllToCloudInner(changedIds, deletedIds){
   const metaData = {
     categories: DATA.categories.map(function(c){
       return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null, storyIds: c.stories.map(function(s){ return s.id; }) };
@@ -933,6 +852,7 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     lastRead: DATA.lastRead,
     version: DATA.version || 0
   };
+  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
   // দ্রুত পথ: শুধু যে গল্পগুলো আসলে যোগ/এডিট/ডিলিট হয়েছে সেগুলোই লেখা হয় —
   // পুরো লাইব্রেরি আবার স্ক্যান/রি-রাইট করার দরকার হয় না। একটা গল্প যোগ করলে
@@ -949,9 +869,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     });
     (deletedIds || []).forEach(function(id){ ops.push({ type:'delete', id }); });
 
-    // আগে গল্পের ডকুমেন্টগুলো লেখা হয় (batch), তারপর সবশেষে META_DOC আপডেট হয় —
-    // এই ক্রম ঠিক রাখা জরুরি, নাহলে META_DOC-এ নতুন গল্পের রেফারেন্স চলে যাবে অথচ
-    // গল্পের আসল ডকুমেন্টটা তখনও ক্লাউডে তৈরিই হয়নি
     for(let i=0; i<ops.length; i+=400){
       const batch = db.batch();
       ops.slice(i, i+400).forEach(function(op){
@@ -964,7 +881,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
       });
       await batch.commit();
     }
-    await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     return;
   }
 
@@ -989,7 +905,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
   const ops = allStories.map(function(s){ return { type: 'set', s: s }; })
     .concat(staleIds.map(function(id){ return { type: 'delete', id: id }; }));
 
-  // এখানেও একই কারণে আগে গল্পগুলো লেখা হয়, META_DOC সবার শেষে
   for(let i=0; i<ops.length; i+=400){
     const batch = db.batch();
     ops.slice(i, i+400).forEach(function(op){
@@ -1002,7 +917,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     });
     await batch.commit();
   }
-  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 }
 
 async function loadData(){
@@ -1014,38 +928,11 @@ async function loadData(){
   if(!DATA.favorites) DATA.favorites = [];
   if(DATA.lastRead === undefined) DATA.lastRead = null;
   renderShelf();
-  restoreNavSessionState();
-
-  // ক্লাউড (Firestore)-এর নিজস্ব অফলাইন ক্যাশ IndexedDB-তে জমা থাকে, যার সাইজ সীমা localStorage-এর
-  // চেয়ে বহুগুণ বড় (সাধারণত কয়েকশ MB থেকে কয়েক GB, ডিভাইসভেদে)। তাই localStorage-এ ছোট/হালকা
-  // মেটাডেটা রাখা হলেও, গল্পের আসল লেখাসহ পূর্ণ ডেটা এই ক্যাশ থেকে প্রায় সাথে সাথেই (নেটওয়ার্ক ছাড়াই)
-  // পাওয়া সম্ভব — এতে আগের মতো "স্মুথ" অভিজ্ঞতা পাওয়া যায়, আবার বড় লাইব্রেরিতেও কোটার সমস্যা হয় না।
-  try{
-    const [cachedMetaDoc, cachedStoriesSnap] = await Promise.all([
-      META_DOC.get({ source: 'cache' }).catch(function(){ return null; }),
-      STORIES_COL.get({ source: 'cache' }).catch(function(){ return null; })
-    ]);
-    if(cachedMetaDoc && cachedMetaDoc.exists && cachedMetaDoc.data() && cachedMetaDoc.data().data){
-      const cachedStoriesMap = {};
-      if(cachedStoriesSnap) cachedStoriesSnap.forEach(function(d){ cachedStoriesMap[d.id] = d.data(); });
-      const cachedData = buildCloudDataFromMeta(cachedMetaDoc.data().data, cachedStoriesMap);
-      const localVersion = DATA.version || 0;
-      const cachedVersion = cachedData.version || 0;
-      const localCount = countStories(DATA);
-      const cachedCount = countStories(cachedData);
-      if(cachedVersion > localVersion || (cachedVersion === localVersion && cachedCount >= localCount)){
-        DATA = cachedData;
-        if(!DATA.favorites) DATA.favorites = [];
-        if(DATA.lastRead === undefined) DATA.lastRead = null;
-        renderShelf();
-        restoreNavSessionState();
-      }
-    }
-  }catch(e){ console.log('cache-first hydrate skipped', e); }
 
   // প্রথমে একবার ক্লাউডের সাথে মিলিয়ে নেওয়া — পুরনো ফরম্যাটে ডেটা থাকলে নতুন ফরম্যাটে মাইগ্রেট করা হবে
   try{
-    const [metaDoc, storiesSnap] = await Promise.all([ META_DOC.get(), STORIES_COL.get() ]);
+    const metaDoc = await META_DOC.get();
+    const storiesSnap = await STORIES_COL.get();
     const storiesMap = {};
     storiesSnap.forEach(function(d){ storiesMap[d.id] = d.data(); });
 
@@ -1064,30 +951,20 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        persistDataToLocalStorage();
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
         renderShelf();
-        restoreNavSessionState();
       } else {
         console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
       }
       // পুরনো ফরম্যাট (গল্প সরাসরি ক্যাটাগরির ভেতরে) হলে নতুন ফরম্যাটে মাইগ্রেট করে দেওয়া,
-      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা — কিন্তু শুধু তখনই, যখন লোকাল ডেটায়
-      // গল্পের আসল লেখা (body) সত্যিই আছে। localStorage কোটা শেষ হয়ে গিয়ে যদি শুধু হালকা
-      // মেটাডেটা (title/id, body ছাড়া) লোড হয়ে থাকে, তাহলে ভুলবশত সেই ফাঁকা কনটেন্ট
-      // ক্লাউডে পুশ করে আসল গল্প মুছে ফেলার ঝুঁকি এড়ানো হয়
+      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা
       const isLegacyFormat = (metaRaw.categories || []).some(function(cm){ return Array.isArray(cm.stories); });
-      if((isLegacyFormat || cloudCount < localCount)){
-        if(localDataHasFullBodies()){
-          pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
-        } else {
-          console.log('লোকাল ডেটায় গল্পের লেখা নেই (শুধু হালকা ক্যাশ) — নিরাপত্তার জন্য ক্লাউডে পুশ করা হচ্ছে না');
-        }
+      if(isLegacyFormat || cloudCount < localCount){
+        pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
       }
     } else {
-      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড (তবে শুধু যদি লোকালে আসল লেখা থাকে)
-      if(localDataHasFullBodies()){
-        pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
-      }
+      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড
+      pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
     }
   }catch(e){ console.log('initial cloud sync failed', e); }
 
@@ -1096,7 +973,6 @@ async function loadData(){
     let lastMeta = null, lastStories = null;
     function applyIfCloudNewer(){
       if(lastMeta === null || lastStories === null) return;
-      if(ownSaveDepth > 0) return; // নিজের সেভ চলাকালীন/সদ্য শেষ হওয়া ইকো আপডেট উপেক্ষা করা হয়
       const cloudData = buildCloudDataFromMeta(lastMeta, lastStories);
       const localVersion = DATA.version || 0;
       const cloudVersion = cloudData.version || 0;
@@ -1107,7 +983,7 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        persistDataToLocalStorage();
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
         renderShelf();
       }
     }
@@ -1127,8 +1003,8 @@ async function loadData(){
 }
 async function saveData(changedIds, deletedIds){
   DATA.version = (DATA.version || 0) + 1;
-  const savedOk = persistDataToLocalStorage();
-  if(!savedOk) showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন');
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+  catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
   try{
     await pushAllToCloud(changedIds, deletedIds);
   }catch(e){
@@ -1142,7 +1018,7 @@ async function saveData(changedIds, deletedIds){
 // বারবার চালালে অ্যাপ স্লো হয়ে যায় এবং অকারণে অনেক বেশি Firestore রিড/রাইট খরচ হয়। তাই শুধু
 // ছোট্ট lastRead তথ্যটুকু META_DOC-এ merge করে আপডেট করা হয়, বাকি গল্পগুলো স্পর্শও করা হয় না।
 async function saveReadingState(){
-  persistDataToLocalStorage();
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
   try{
     await META_DOC.set({ data: { lastRead: DATA.lastRead }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
   }catch(e){ console.log('reading state cloud save failed (offline or error)', e); }
@@ -1255,58 +1131,6 @@ function setView(id, direction){
     else { el.classList.remove('active'); el.classList.add(direction==='back' ? 'offscreen-right' : 'offscreen-left'); }
   });
   setTimeout(()=>{ ['home','category','story','wishlist','typeList'].forEach(v=>{ const el=document.getElementById(v); if(el && v!==id) el.classList.add('hidden-view'); }); }, 520);
-  saveNavSessionState(id);
-}
-function saveNavSessionState(viewId){
-  try{
-    sessionStorage.setItem(NAV_STATE_KEY, JSON.stringify({ view: viewId, catId: currentCatId, storyId: currentStoryId }));
-  }catch(e){}
-}
-let navRestoreDone = false;
-function restoreNavSessionState(){
-  if(navRestoreDone) return; // একবার সফলভাবে হয়ে গেলে আবার চালানোর দরকার নেই (নাহলে হিস্ট্রি এন্ট্রি ডুপ্লিকেট হবে)
-  let state = null;
-  try{ state = JSON.parse(sessionStorage.getItem(NAV_STATE_KEY) || 'null'); }catch(e){ return; }
-  if(!state || !state.view || state.view === 'home') return;
-
-  if(state.view === 'category'){
-    if(state.catId === '__fav__'){
-      currentCatId = '__fav__';
-      renderFavoritesToc();
-      safeHistory(()=>history.pushState({view:'category', catId:'__fav__'}, '', '#favorites'));
-      setView('category','forward');
-    } else if(state.catId === '__all__'){
-      currentCatId = '__all__';
-      renderAllStoriesToc();
-      safeHistory(()=>history.pushState({view:'category', catId:'__all__'}, '', '#all'));
-      setView('category','forward');
-    } else {
-      const cat = DATA.categories.find(c=>c.id===state.catId);
-      if(!cat) return; // ক্যাটাগরিটা আর নেই — নিরাপদে হোমেই থাকা
-      currentCatId = state.catId;
-      renderToc();
-      safeHistory(()=>history.pushState({view:'category', catId:state.catId}, '', '#cat'));
-      setView('category','forward');
-    }
-  } else if(state.view === 'story'){
-    const cat = DATA.categories.find(c=>c.id===state.catId);
-    const story = cat && cat.stories.find(s=>s.id===state.storyId);
-    if(!cat || !story) return; // গল্প/ক্যাটাগরি ডিলিট হয়ে থাকলে হোমেই থাকা নিরাপদ
-    if(story.body === undefined) return;
-    // localStorage-এ শুধু হালকা মেটাডেটা (title/id) থাকে, গল্পের আসল লেখা (body) থাকে না —
-    // তাই প্রথমবার (ক্লাউড সিঙ্কের আগে) body না থাকলে এখনই রেন্ডার না করে অপেক্ষা করা হয়;
-    // ক্লাউড থেকে পূর্ণ ডেটা এলে loadData() আবার এই ফাংশনটা কল করবে, তখন সফলভাবে রিস্টোর হবে
-    currentCatId = state.catId;
-    safeHistory(()=>history.pushState({view:'story', catId:state.catId, storyId:state.storyId}, '', '#story'));
-    setView('story','forward');
-    const savedScroll = (DATA.lastRead && DATA.lastRead.storyId === state.storyId) ? (DATA.lastRead.scrollY || 0) : 0;
-    renderStory(state.storyId, savedScroll);
-  } else if(state.view === 'wishlist'){
-    renderWishlistToc();
-    safeHistory(()=>history.pushState({view:'wishlist'}, '', '#wishlist'));
-    setView('wishlist','forward');
-  }
-  navRestoreDone = true;
 }
 
 /* ---------- HISTORY / BACK BUTTON HANDLING ---------- */
@@ -1730,36 +1554,6 @@ function renderStory(id, scrollTo){
   document.getElementById('storyTopTitle').textContent = (cat.type==='series' && s.epNum!=null) ? `পর্ব ${toBengaliNum(s.epNum)}` : s.title;
   document.getElementById('storyMeta').textContent = `পড়ার সময় ${s.readtime}`;
 
-  // বড় লাইব্রেরিতে localStorage কোটার কারণে গল্পের লেখা (body) সাময়িকভাবে লোকালে না-ও থাকতে পারে —
-  // ক্লাউড থেকে সিঙ্ক হয়ে আসা পর্যন্ত এখানে ক্র্যাশ না করে একটা লোডিং বার্তা দেখানো হয়, আর
-  // অল্প কিছুক্ষণ পরপর আবার চেষ্টা করা হয় (ক্লাউড ডেটা এসে গেলেই স্বয়ংক্রিয়ভাবে আসল লেখা দেখাবে)
-  if(s.body === undefined){
-    document.getElementById('storyBody').innerHTML = `
-      <div style="text-align:center;padding:60px 20px;color:var(--slate);">
-        <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড হচ্ছে…</p>
-        <p style="font-size:13px;opacity:.7;">একটু অপেক্ষা করুন, ইন্টারনেট সংযোগ থাকলে এটা নিজে থেকেই চলে আসবে।</p>
-      </div>`;
-    let tries = 0;
-    const retry = () => {
-      tries++;
-      const freshCat = getCat();
-      const freshStory = freshCat && freshCat.stories.find(x=>x.id===id);
-      if(currentStoryId !== id) return; // ইতিমধ্যে অন্য গল্পে চলে গেছে, রিট্রাই বন্ধ
-      if(freshStory && freshStory.body !== undefined){
-        renderStory(id, scrollTo);
-      } else if(tries < 15){
-        setTimeout(retry, 800);
-      } else {
-        document.getElementById('storyBody').innerHTML = `
-          <div style="text-align:center;padding:60px 20px;color:var(--slate);">
-            <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।</p>
-          </div>`;
-      }
-    };
-    setTimeout(retry, 800);
-    return;
-  }
-
   /* ── Split into ~200-word numbered sections ── */
   const rawParas = s.body.split(/\n+/).filter(p => p.trim());
   const WORDS_PER_SECTION = 800;
@@ -2178,7 +1972,6 @@ function openShortStoryAddMenu(){
     <div class="btn-row" style="flex-direction:column;gap:12px;">
       <button class="btn btn-primary" style="width:100%;" onclick="openAddStory()">＋ নতুন গল্প</button>
       <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerDocxUpload()">📄 Word (.docx) থেকে টাইটেল অনুযায়ী গল্প যোগ করুন</button>
-      <button class="btn btn-ghost" style="width:100%;" onclick="closeModal();triggerBloggerUpload()">🌐 Blogger এক্সপোর্ট (.xml) থেকে সব পোস্ট যোগ করুন</button>
     </div>
   `);
 }
@@ -2234,7 +2027,6 @@ async function saveNewStory(){
 function openEditStory(){
   const s = getStory();
   if(!s) return;
-  if(s.body === undefined){ showToast('গল্পের লেখা এখনও ক্লাউড থেকে লোড হচ্ছে, একটু পর আবার চেষ্টা করুন'); return; }
   const cat = getCat();
   const isSeries = cat && cat.type === 'series';
   openModal(`
@@ -2934,7 +2726,6 @@ function jumpToParaSection(idx){
 
 /* ── Word Count ── */
 function getWordCount(text){
-  if(!text) return 0; // body এখনও ক্লাউড থেকে লোড না হয়ে থাকলে (undefined) ক্র্যাশ না করে ০ দেখানো হয়
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
@@ -3115,95 +2906,6 @@ async function handleDocxFile(e){
   }catch(err){
     console.log('docx parse error', err);
     showToast('ফাইলটা পড়া যায়নি। ফাইলটা ক্ষতিগ্রস্ত হতে পারে।');
-  }
-}
-
-/* ── Blogger এক্সপোর্ট (.xml) থেকে সব পোস্ট গল্প হিসেবে বাল্ক-আপলোড ──
-   Blogger-এর Settings > Manage blog > Back up content দিয়ে এক্সপোর্ট করা ফাইলে
-   পোস্ট, পেজ, কমেন্ট সবকিছু একই <entry> স্ট্রাকচারে মেশানো থাকে — তাই শুধু আসল
-   ব্লগ-পোস্টগুলো বেছে নেওয়া হয় (kind#post ক্যাটাগরি চেক করে) */
-function triggerBloggerUpload(){
-  const inp = document.getElementById('bloggerFileInput');
-  if(!inp) return;
-  inp.value = '';
-  inp.click();
-}
-function isBloggerPostEntry(entry){
-  const cats = entry.getElementsByTagName('category');
-  for(let i=0;i<cats.length;i++){
-    const scheme = cats[i].getAttribute('scheme') || '';
-    const term = cats[i].getAttribute('term') || '';
-    if(scheme.indexOf('#kind') !== -1 && term.indexOf('#post') !== -1) return true;
-  }
-  return false;
-}
-function getEntryChildText(entry, tagName){
-  const els = entry.getElementsByTagName(tagName);
-  return els.length ? els[0].textContent : '';
-}
-async function handleBloggerFile(e){
-  const file = e.target.files && e.target.files[0];
-  if(!file) return;
-  if(!/\.xml$/i.test(file.name)){ showToast('Blogger থেকে এক্সপোর্ট করা .xml ফাইল বাছাই করুন'); return; }
-  const cat = getCat();
-  if(!cat){ showToast('আগে একটা ক্যাটাগরিতে ঢুকুন'); return; }
-  const sizeMB = file.size / (1024*1024);
-  showToast(sizeMB > 8 ? 'বড় ফাইল — পড়তে কিছুটা সময় লাগবে, অ্যাপ বন্ধ করবেন না…' : 'ফাইল পড়া হচ্ছে, একটু অপেক্ষা করুন…');
-  // ব্রাউজারকে toast-টা আঁকার (paint) সুযোগ দেওয়া, তারপরই ভারী কাজ শুরু করা
-  await new Promise(r=>setTimeout(r, 30));
-  try{
-    const xmlText = await file.text();
-    const xmlDoc = new DOMParser().parseFromString(xmlText, 'application/xml');
-    if(xmlDoc.getElementsByTagName('parsererror').length){ showToast('ফাইলটা পড়া যায়নি — সঠিক Blogger এক্সপোর্ট ফাইল কিনা দেখুন'); return; }
-
-    const entries = Array.from(xmlDoc.getElementsByTagName('entry')).filter(isBloggerPostEntry);
-    if(!entries.length){ showToast('এই ফাইলে কোনো ব্লগ পোস্ট পাওয়া যায়নি'); return; }
-
-    // বড় ফাইলে (হাজার হাজার পোস্ট) একসাথে সব প্রসেস করলে ব্রাউজার কিছুক্ষণের জন্য জমে যেতে পারে (unresponsive),
-    // তাই অল্প অল্প করে (চাংকে) প্রসেস করে মাঝে মাঝে ব্রাউজারকে "শ্বাস নেওয়ার" সুযোগ দেওয়া হয় —
-    // এতে অ্যাপ freeze না হয়ে চলতে থাকে এবং প্রগ্রেস দেখানো যায়
-    const CHUNK_SIZE = 150;
-    const posts = [];
-    for(let i=0; i<entries.length; i+=CHUNK_SIZE){
-      const chunk = entries.slice(i, i+CHUNK_SIZE);
-      chunk.forEach(entry=>{
-        const title = getEntryChildText(entry, 'title').trim() || 'শিরোনামহীন';
-        const contentHtml = getEntryChildText(entry, 'content');
-        const body = extractTextFromHtml(contentHtml || '');
-        const published = getEntryChildText(entry, 'published') || '';
-        if(body) posts.push({ title, body, published });
-      });
-      if(entries.length > CHUNK_SIZE){
-        showToast(`পোস্ট পড়া হচ্ছে… ${toBengaliNum(Math.min(i+CHUNK_SIZE, entries.length))}/${toBengaliNum(entries.length)}`);
-      }
-      await new Promise(r=>setTimeout(r, 0)); // মূল থ্রেড ছেড়ে দেওয়া (UI ফ্রিজ এড়াতে)
-    }
-    if(!posts.length){ showToast('কোনো পোস্টের লেখা খুঁজে পাওয়া যায়নি'); return; }
-
-    // পুরনো পোস্ট আগে, নতুন পোস্ট পরে — স্বাভাবিক পড়ার ক্রম অনুযায়ী সাজানো
-    posts.sort((a,b)=> new Date(a.published) - new Date(b.published));
-
-    const addedIds = [];
-    for(let i=0; i<posts.length; i+=CHUNK_SIZE){
-      const chunk = posts.slice(i, i+CHUNK_SIZE);
-      chunk.forEach(p=>{
-        const newId = uid();
-        cat.stories.push({ id: newId, title: p.title, body: p.body, readtime: estimateReadtime(p.body) });
-        addedIds.push(newId);
-      });
-      if(posts.length > CHUNK_SIZE){
-        showToast(`গল্প যোগ হচ্ছে… ${toBengaliNum(Math.min(i+CHUNK_SIZE, posts.length))}/${toBengaliNum(posts.length)}`);
-      }
-      await new Promise(r=>setTimeout(r, 0));
-    }
-
-    showToast('ক্লাউডে সেভ হচ্ছে, একটু অপেক্ষা করুন…');
-    await saveData(addedIds);
-    showToast(`${toBengaliNum(addedIds.length)} টি গল্প যোগ হয়েছে`);
-    renderToc();
-  }catch(err){
-    console.log('blogger xml parse error', err);
-    showToast('ফাইলটা পড়া যায়নি। এক্সপোর্ট ফাইলটা ঠিক আছে কিনা দেখুন।');
   }
 }
 
