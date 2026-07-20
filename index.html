@@ -547,6 +547,11 @@
     <button class="drawer-btn" onclick="triggerRestoreBackup()">⬆️ ব্যাকআপ থেকে পুনরুদ্ধার করুন</button>
     <input type="file" id="restoreFileInput" accept=".json" style="display:none" onchange="handleRestoreFile(event)">
   </div>
+  <div class="drawer-section">
+    <span class="drawer-label">সমস্যা সমাধান</span>
+    <button class="drawer-btn" onclick="forceResyncFromCloud()">☁️ ক্লাউড থেকে আবার সিঙ্ক করুন</button>
+    <div style="font-size:11px;color:rgba(255,255,255,.4);font-family:'Hind Siliguri',sans-serif;margin-top:8px;line-height:1.6;">গল্পে "০ শব্দ" দেখালে বা লেখা খালি মনে হলে এটা চাপুন — লোকাল ক্যাশ মুছে ক্লাউড থেকে সব ঠিকভাবে আবার আনবে।</div>
+  </div>
 </div>
 
 <div class="reading-progress-bar" id="readingProgressBar"></div>
@@ -3016,6 +3021,16 @@ async function handleEpubFile(e){
 }
 
 /* ── ব্যাকআপ / এক্সপোর্ট / রিস্টোর ── */
+// লোকাল ক্যাশ (localStorage) কোনো কারণে পুরনো/অসম্পূর্ণ হয়ে গেলে (যেমন: গল্পে "০ শব্দ" দেখানো,
+// লেখা খালি মনে হওয়া) — এই ফাংশনটা শুধু লোকাল ক্যাশ মুছে দেয়, ক্লাউডের (Firestore) আসল ডেটা
+// স্পর্শও করে না। পরের রিলোডে অ্যাপ বাধ্য হয়ে ক্লাউড থেকেই সবকিছু আবার আনবে।
+function forceResyncFromCloud(){
+  const ok = confirm('এটা এই ডিভাইসের লোকাল ক্যাশ মুছে ফেলবে (ক্লাউডের ডেটা অক্ষত থাকবে), তারপর ক্লাউড থেকে আবার সব লোড হবে। এগিয়ে যেতে চান?');
+  if(!ok) return;
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  location.reload();
+}
+
 function exportBackup(){
   try{
     const readSetArr = Array.from(getReadSet());
