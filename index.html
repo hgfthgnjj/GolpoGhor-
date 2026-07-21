@@ -822,59 +822,6 @@ let scrollSaveTimer = null;
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-// localStorage-এ পুরো DATA (গল্পের আসল লেখাসহ) সেভ করা হয়, কিন্তু ব্রাউজারে localStorage-এর
-// সাইজ সীমা সাধারণত মাত্র ৫-১০ MB। লাইব্রেরি অনেক বড় হয়ে গেলে এটা ছাড়িয়ে যেতে পারে — তখন
-// localStorage.setItem() নিঃশব্দে ফেইল করে, আর পরের বার অ্যাপ রিলোড করলে নতুন যোগ করা গল্পগুলো
-// "হারিয়ে" যায়। তাই localStorage-এ শুধু হালকা মেটাডেটা (টাইটেল, আইডি ইত্যাদি) রাখা হয় — গল্পের
-// আসল লেখা (body) রাখা হয় না। আসল লেখা ক্লাউডে (Firestore, প্রতিটা গল্প আলাদা ডকুমেন্টে) থাকে,
-// আর Firestore-এর নিজস্ব অফলাইন ক্যাশ (IndexedDB) ব্যবহার করে — তার সাইজ সীমা localStorage-এর
-// চেয়ে বহুগুণ বেশি, তাই অফলাইনেও বড় লাইব্রেরি নির্ভরযোগ্যভাবে কাজ করবে।
-function getLocalStorageSafeData(){
-  return {
-    categories: (DATA.categories || []).map(function(c){
-      return {
-        id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null,
-        stories: (c.stories || []).map(function(s){
-          return { id: s.id, title: s.title, readtime: s.readtime, epNum: (s.epNum!=null ? s.epNum : undefined) };
-        })
-      };
-    }),
-    favorites: DATA.favorites || [],
-    lastRead: DATA.lastRead === undefined ? null : DATA.lastRead,
-    version: DATA.version || 0
-  };
-}
-// সেভ করার কৌশল: আগে পুরো DATA (গল্পের লেখাসহ) লোকালে রাখার চেষ্টা করা হয় — এতে অফলাইনে
-// এডিট করা গল্পও নিরাপদ থাকে (ক্লাউডে সিঙ্ক না হওয়া পর্যন্ত)। শুধু লাইব্রেরি বড় হয়ে গিয়ে
-// localStorage-এর কোটা শেষ হয়ে গেলেই (QuotaExceededError) হালকা মেটাডেটা-ভার্সনে ফলব্যাক করা হয়,
-// যাতে অন্তত অ্যাপ ভেঙে না পড়ে এবং টাইটেল/তালিকা ঠিক থাকে (গল্পের লেখা তখন শুধু ক্লাউড থেকেই আসবে)।
-function persistDataToLocalStorage(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
-    return true;
-  }catch(e){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(getLocalStorageSafeData()));
-      console.log('localStorage কোটা শেষ — শুধু হালকা মেটাডেটা সেভ হয়েছে, গল্পের লেখা ক্লাউড থেকে আসবে');
-      return true;
-    }catch(e2){
-      console.log('localStorage সম্পূর্ণ পূর্ণ, কিছুই সেভ করা যায়নি', e2);
-      return false;
-    }
-  }
-}
-// লোকাল DATA-তে গল্পের আসল লেখা (body) আছে কিনা যাচাই করা — না থাকলে বুঝতে হবে এটা
-// localStorage কোটা শেষ হয়ে যাওয়ায় সেভ হওয়া "হালকা" মেটাডেটা-ভার্সন, তাই এটা ক্লাউডে
-// পুশ করা নিরাপদ না (নাহলে আসল গল্পের লেখা মুছে যাবে)
-function localDataHasFullBodies(){
-  for(const c of (DATA.categories||[])){
-    for(const s of (c.stories||[])){
-      if(s.body === undefined) return false;
-    }
-  }
-  return true;
-}
-
 /* ---------- STORAGE (লোকাল + ক্লাউড) ---------- */
 
 // meta ডকুমেন্ট (পুরনো বা নতুন যেকোনো ফরম্যাটে) + স্টোরি ডকুমেন্টগুলো থেকে পূর্ণ DATA অবজেক্ট বানানো
@@ -901,21 +848,7 @@ function countStories(d){
 
 // DATA-কে meta ডকুমেন্ট (ছোট) + প্রতিটা গল্পের আলাদা ডকুমেন্টে ভেঙে ক্লাউডে পুশ করা,
 // এবং ডিলিট হওয়া গল্প থাকলে সেগুলোও ক্লাউড থেকে সরিয়ে দেওয়া
-// এই ফ্ল্যাগটা যতক্ষণ ধনাত্মক থাকে, ততক্ষণ ক্লাউড থেকে আসা রিয়েল-টাইম আপডেট উপেক্ষা করা হয়।
-// কারণ: META_DOC আর STORIES_COL — এই দুটো আলাদা Firestore রাইট, তাই একসাথে (atomically) হয় না।
-// বড় ব্যাচে (যেমন docx থেকে একসাথে অনেক গল্প) মাঝখানে কোনো একটা লিসেনার যদি অসম্পূর্ণ অবস্থায়
-// স্ন্যাপশট পড়ে ফেলে, ভুল/অসম্পূর্ণ তথ্য লোকালে সেভ হয়ে যেতে পারে। তাই নিজের সেভ চলাকালীন
-// (এবং শেষ হওয়ার পরও কিছুক্ষণ) এই ইকো-আপডেটগুলো উপেক্ষা করা হয়।
-let ownSaveDepth = 0;
 async function pushAllToCloud(changedIds, deletedIds){
-  ownSaveDepth++;
-  try{
-    await pushAllToCloudInner(changedIds, deletedIds);
-  } finally {
-    setTimeout(function(){ ownSaveDepth = Math.max(0, ownSaveDepth-1); }, 800);
-  }
-}
-async function pushAllToCloudInner(changedIds, deletedIds){
   const metaData = {
     categories: DATA.categories.map(function(c){
       return { id: c.id, name: c.name, color: c.color, emoji: c.emoji, type: c.type || null, storyIds: c.stories.map(function(s){ return s.id; }) };
@@ -924,6 +857,7 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     lastRead: DATA.lastRead,
     version: DATA.version || 0
   };
+  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
   // দ্রুত পথ: শুধু যে গল্পগুলো আসলে যোগ/এডিট/ডিলিট হয়েছে সেগুলোই লেখা হয় —
   // পুরো লাইব্রেরি আবার স্ক্যান/রি-রাইট করার দরকার হয় না। একটা গল্প যোগ করলে
@@ -940,11 +874,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     });
     (deletedIds || []).forEach(function(id){ ops.push({ type:'delete', id }); });
 
-    // আগে গল্পের ডকুমেন্টগুলো (batch) লেখা হয়, তারপর সবশেষে META_DOC আপডেট হয়। এই ক্রম
-    // ঠিক রাখা খুব জরুরি — বড় ব্যাচে (যেমন ৭০০ গল্পের docx আপলোড) যদি মাঝপথে নেট চলে যায়
-    // বা অ্যাপ বন্ধ হয়ে যায়, তাহলে META_DOC-এ নতুন গল্পের রেফারেন্স ইতিমধ্যে চলে যাবে অথচ
-    // গল্পের আসল ডকুমেন্টগুলো তখনও ক্লাউডে তৈরিই হয়নি — ফলে পরে "resync" করলেও সেই গল্পগুলো
-    // চিরতরে হারিয়ে যায় (মেটাডেটা এমন গল্প রেফার করে যেগুলোর আসল ডকুমেন্ট নেই)।
     for(let i=0; i<ops.length; i+=400){
       const batch = db.batch();
       ops.slice(i, i+400).forEach(function(op){
@@ -957,7 +886,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
       });
       await batch.commit();
     }
-    await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
     return;
   }
 
@@ -982,7 +910,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
   const ops = allStories.map(function(s){ return { type: 'set', s: s }; })
     .concat(staleIds.map(function(id){ return { type: 'delete', id: id }; }));
 
-  // এখানেও একই কারণে আগে গল্পগুলো লেখা হয়, META_DOC সবার শেষে
   for(let i=0; i<ops.length; i+=400){
     const batch = db.batch();
     ops.slice(i, i+400).forEach(function(op){
@@ -995,7 +922,6 @@ async function pushAllToCloudInner(changedIds, deletedIds){
     });
     await batch.commit();
   }
-  await META_DOC.set({ data: metaData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
 }
 
 async function loadData(){
@@ -1008,35 +934,10 @@ async function loadData(){
   if(DATA.lastRead === undefined) DATA.lastRead = null;
   renderShelf();
 
-  // ক্লাউড (Firestore)-এর নিজস্ব অফলাইন ক্যাশ IndexedDB-তে জমা থাকে, যার সাইজ সীমা localStorage-এর
-  // চেয়ে বহুগুণ বড়। তাই localStorage-এ ছোট/হালকা মেটাডেটা থাকলেও, গল্পের আসল লেখাসহ পূর্ণ ডেটা
-  // এই ক্যাশ থেকে প্রায় সাথে সাথেই (নেটওয়ার্ক ছাড়াই) পাওয়া সম্ভব — এতে আগের মতো "স্মুথ" অভিজ্ঞতা
-  // পাওয়া যায়, আবার বড় লাইব্রেরিতেও কোটার সমস্যা হয় না।
-  try{
-    const [cachedMetaDoc, cachedStoriesSnap] = await Promise.all([
-      META_DOC.get({ source: 'cache' }).catch(function(){ return null; }),
-      STORIES_COL.get({ source: 'cache' }).catch(function(){ return null; })
-    ]);
-    if(cachedMetaDoc && cachedMetaDoc.exists && cachedMetaDoc.data() && cachedMetaDoc.data().data){
-      const cachedStoriesMap = {};
-      if(cachedStoriesSnap) cachedStoriesSnap.forEach(function(d){ cachedStoriesMap[d.id] = d.data(); });
-      const cachedData = buildCloudDataFromMeta(cachedMetaDoc.data().data, cachedStoriesMap);
-      const localVersion = DATA.version || 0;
-      const cachedVersion = cachedData.version || 0;
-      const localCount = countStories(DATA);
-      const cachedCount = countStories(cachedData);
-      if(cachedVersion > localVersion || (cachedVersion === localVersion && cachedCount >= localCount)){
-        DATA = cachedData;
-        if(!DATA.favorites) DATA.favorites = [];
-        if(DATA.lastRead === undefined) DATA.lastRead = null;
-        renderShelf();
-      }
-    }
-  }catch(e){ console.log('cache-first hydrate skipped', e); }
-
   // প্রথমে একবার ক্লাউডের সাথে মিলিয়ে নেওয়া — পুরনো ফরম্যাটে ডেটা থাকলে নতুন ফরম্যাটে মাইগ্রেট করা হবে
   try{
-    const [metaDoc, storiesSnap] = await Promise.all([ META_DOC.get(), STORIES_COL.get() ]);
+    const metaDoc = await META_DOC.get();
+    const storiesSnap = await STORIES_COL.get();
     const storiesMap = {};
     storiesSnap.forEach(function(d){ storiesMap[d.id] = d.data(); });
 
@@ -1055,29 +956,20 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        persistDataToLocalStorage();
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
         renderShelf();
       } else {
         console.log('লোকাল ডেটা বেশি, ক্লাউডে আপলোড হচ্ছে...');
       }
       // পুরনো ফরম্যাট (গল্প সরাসরি ক্যাটাগরির ভেতরে) হলে নতুন ফরম্যাটে মাইগ্রেট করে দেওয়া,
-      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা — কিন্তু শুধু তখনই, যখন লোকাল ডেটায়
-      // গল্পের আসল লেখা (body) সত্যিই আছে। localStorage কোটা শেষ হয়ে গিয়ে যদি শুধু হালকা
-      // মেটাডেটা (title/id, body ছাড়া) লোড হয়ে থাকে, তাহলে ভুলবশত সেই ফাঁকা কনটেন্ট
-      // ক্লাউডে পুশ করে আসল গল্প মুছে ফেলার ঝুঁকি এড়ানো হয়
+      // অথবা লোকাল ডেটা এগিয়ে থাকলে সেটা ক্লাউডে পুশ করা
       const isLegacyFormat = (metaRaw.categories || []).some(function(cm){ return Array.isArray(cm.stories); });
-      if((isLegacyFormat || cloudCount < localCount)){
-        if(localDataHasFullBodies()){
-          pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
-        } else {
-          console.log('লোকাল ডেটায় গল্পের লেখা নেই (শুধু হালকা ক্যাশ) — নিরাপত্তার জন্য ক্লাউডে পুশ করা হচ্ছে না');
-        }
+      if(isLegacyFormat || cloudCount < localCount){
+        pushAllToCloud().catch(function(e){ console.log('migration/merge push failed', e); });
       }
     } else {
-      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড (তবে শুধু যদি লোকালে আসল লেখা থাকে)
-      if(localDataHasFullBodies()){
-        pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
-      }
+      // ক্লাউডে কিছুই নেই — লোকাল ডেটা প্রথমবার ক্লাউডে আপলোড
+      pushAllToCloud().catch(function(e){ console.log('initial cloud push failed', e); });
     }
   }catch(e){ console.log('initial cloud sync failed', e); }
 
@@ -1086,7 +978,6 @@ async function loadData(){
     let lastMeta = null, lastStories = null;
     function applyIfCloudNewer(){
       if(lastMeta === null || lastStories === null) return;
-      if(ownSaveDepth > 0) return; // নিজের সেভ চলাকালীন/সদ্য শেষ হওয়া ইকো আপডেট উপেক্ষা করা হয়
       const cloudData = buildCloudDataFromMeta(lastMeta, lastStories);
       const localVersion = DATA.version || 0;
       const cloudVersion = cloudData.version || 0;
@@ -1097,7 +988,7 @@ async function loadData(){
         DATA = cloudData;
         if(!DATA.favorites) DATA.favorites = [];
         if(DATA.lastRead === undefined) DATA.lastRead = null;
-        persistDataToLocalStorage();
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
         renderShelf();
       }
     }
@@ -1117,8 +1008,8 @@ async function loadData(){
 }
 async function saveData(changedIds, deletedIds){
   DATA.version = (DATA.version || 0) + 1;
-  const savedOk = persistDataToLocalStorage();
-  if(!savedOk) showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন');
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+  catch(e){ showToast('সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন'); }
   try{
     await pushAllToCloud(changedIds, deletedIds);
   }catch(e){
@@ -1132,7 +1023,7 @@ async function saveData(changedIds, deletedIds){
 // বারবার চালালে অ্যাপ স্লো হয়ে যায় এবং অকারণে অনেক বেশি Firestore রিড/রাইট খরচ হয়। তাই শুধু
 // ছোট্ট lastRead তথ্যটুকু META_DOC-এ merge করে আপডেট করা হয়, বাকি গল্পগুলো স্পর্শও করা হয় না।
 async function saveReadingState(){
-  persistDataToLocalStorage();
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }catch(e){}
   try{
     await META_DOC.set({ data: { lastRead: DATA.lastRead }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
   }catch(e){ console.log('reading state cloud save failed (offline or error)', e); }
@@ -1668,36 +1559,6 @@ function renderStory(id, scrollTo){
   document.getElementById('storyTopTitle').textContent = (cat.type==='series' && s.epNum!=null) ? `পর্ব ${toBengaliNum(s.epNum)}` : s.title;
   document.getElementById('storyMeta').textContent = `পড়ার সময় ${s.readtime}`;
 
-  // বড় লাইব্রেরিতে localStorage কোটার কারণে গল্পের লেখা (body) সাময়িকভাবে লোকালে না-ও থাকতে পারে —
-  // ক্লাউড থেকে সিঙ্ক হয়ে আসা পর্যন্ত এখানে ক্র্যাশ না করে একটা লোডিং বার্তা দেখানো হয়, আর
-  // অল্প কিছুক্ষণ পরপর আবার চেষ্টা করা হয় (ক্লাউড ডেটা এসে গেলেই স্বয়ংক্রিয়ভাবে আসল লেখা দেখাবে)
-  if(s.body === undefined){
-    document.getElementById('storyBody').innerHTML = `
-      <div style="text-align:center;padding:60px 20px;color:var(--slate);">
-        <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড হচ্ছে…</p>
-        <p style="font-size:13px;opacity:.7;">একটু অপেক্ষা করুন, ইন্টারনেট সংযোগ থাকলে এটা নিজে থেকেই চলে আসবে।</p>
-      </div>`;
-    let tries = 0;
-    const retry = () => {
-      tries++;
-      const freshCat = getCat();
-      const freshStory = freshCat && freshCat.stories.find(x=>x.id===id);
-      if(currentStoryId !== id) return; // ইতিমধ্যে অন্য গল্পে চলে গেছে, রিট্রাই বন্ধ
-      if(freshStory && freshStory.body !== undefined){
-        renderStory(id, scrollTo);
-      } else if(tries < 15){
-        setTimeout(retry, 800);
-      } else {
-        document.getElementById('storyBody').innerHTML = `
-          <div style="text-align:center;padding:60px 20px;color:var(--slate);">
-            <p style="font-size:15px;line-height:1.8;">গল্পের লেখা লোড করা যায়নি। ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।</p>
-          </div>`;
-      }
-    };
-    setTimeout(retry, 800);
-    return;
-  }
-
   /* ── Split into ~200-word numbered sections ── */
   const rawParas = s.body.split(/\n+/).filter(p => p.trim());
   const WORDS_PER_SECTION = 800;
@@ -2171,7 +2032,6 @@ async function saveNewStory(){
 function openEditStory(){
   const s = getStory();
   if(!s) return;
-  if(s.body === undefined){ showToast('গল্পের লেখা এখনও ক্লাউড থেকে লোড হচ্ছে, একটু পর আবার চেষ্টা করুন'); return; }
   const cat = getCat();
   const isSeries = cat && cat.type === 'series';
   openModal(`
